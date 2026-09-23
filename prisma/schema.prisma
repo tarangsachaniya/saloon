@@ -1,0 +1,179 @@
+// Prisma schema for the single-salon booking system.
+// See migration plan: single-salon-booking-system-shiny-panda.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum UserRole {
+  OWNER
+  STAFF
+}
+
+/// Singleton row holding the one salon's profile + booking policy.
+model SalonSettings {
+  id                          Int      @id @default(1)
+  name                        String
+  logo                        String?
+  phone                       String?
+  email                       String?
+  address                     String?
+  slotIntervalMinutes         Int      @default(15)
+  minimumAdvanceBookingMinutes Int     @default(30)
+  maximumAdvanceBookingDays   Int      @default(30)
+  cancellationWindowMinutes   Int      @default(60)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}
+
+/// One row per weekday (0=Sunday..6=Saturday) for the salon's own hours.
+model SalonOpeningHour {
+  id        Int     @id @default(autoincrement())
+  weekday   Int     @unique
+  isOpen    Boolean @default(true)
+  openTime  Int
+  closeTime Int
+}
+
+model Barber {
+  id              String   @id @default(uuid())
+  name            String
+  phone           String?
+  email           String?
+  photo           String?
+  bio             String?
+  specializations String[]
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  services      Service[]          @relation("BarberServices")
+  workingHours  BarberWorkingHour[]
+  breaks        BarberBreak[]
+  daysOff       BarberDayOff[]
+  appointments  Appointment[]
+}
+
+/// One row per barber per weekday.
+model BarberWorkingHour {
+  id        String  @id @default(uuid())
+  barberId  String
+  barber    Barber  @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  weekday   Int
+  isWorking Boolean @default(true)
+  startTime Int
+  endTime   Int
+
+  @@unique([barberId, weekday])
+}
+
+/// A recurring weekly break (e.g. lunch) for a barber.
+model BarberBreak {
+  id        String  @id @default(uuid())
+  barberId  String
+  barber    Barber  @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  weekday   Int
+  startTime Int
+  endTime   Int
+  label     String?
+}
+
+/// A one-off day the barber is unavailable (holiday, leave, etc.).
+model BarberDayOff {
+  id       String   @id @default(uuid())
+  barberId String
+  barber   Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  date     DateTime @db.Date
+  reason   String?
+
+  @@unique([barberId, date])
+}
+
+model Service {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  price           Decimal  @db.Decimal(10, 2)
+  durationMinutes Int
+  category        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  barbers      Barber[]      @relation("BarberServices")
+  appointments Appointment[]
+}
+
+model Client {
+  id          String    @id @default(uuid())
+  name        String
+  phone       String    @unique
+  email       String?
+  notes       String?
+  totalVisits Int       @default(0)
+  lastVisit   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  appointments Appointment[]
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  clientId        String
+  client          Client            @relation(fields: [clientId], references: [id])
+  barberId        String
+  barber          Barber            @relation(fields: [barberId], references: [id])
+  serviceId       String
+  service         Service           @relation(fields: [serviceId], references: [id])
+  appointmentDate DateTime          @db.Date
+  startTime       Int
+  endTime         Int
+  durationMinutes Int
+  price           Decimal           @db.Decimal(10, 2)
+  status          AppointmentStatus @default(CONFIRMED)
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // NOTE: a generated `slotRange tsrange` column + a Postgres EXCLUDE USING gist
+  // constraint on (barberId, slotRange) WHERE status NOT IN (CANCELLED, NO_SHOW)
+  // is added via a hand-written migration (see prisma/migrations/*_add_overlap_exclusion).
+  // That column/constraint is intentionally NOT modeled here - Prisma's schema
+  // language cannot express generated columns or exclusion constraints, and the
+  // app never needs to read that column directly.
+
+  @@index([barberId, appointmentDate])
+  @@index([clientId])
+}
+
+/// Admin/staff login accounts only - customers never authenticate.
+model User {
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String?
+  email       String   @unique
+  password    String
+  phoneNumber String?
+  role        UserRole @default(STAFF)
+  enabled     Boolean  @default(true)
+  passToken   String?
+  devices     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
