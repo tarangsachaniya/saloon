@@ -10,6 +10,7 @@ import {
   TeamSection,
   VisitSection,
 } from "@/components/shop/ShopSections";
+import { seoText } from "@/lib/seo";
 import { getActiveSalon } from "@/lib/server/salon";
 import { embedUrlFor, getShopData, mapLinkFor, mapViewUrlFor } from "@/lib/server/shop";
 import { isThemeId, THEME_TOKENS, type ThemeId } from "@/lib/themes";
@@ -38,11 +39,11 @@ export default async function SalonShopPage({ params }: { params: Promise<{ slug
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "HairSalon",
-    name: salon.name,
-    description: salon.tagline ?? undefined,
+    name: seoText(salon.name),
+    description: seoText(salon.tagline),
     telephone: phone ?? undefined,
     email: salon.email ?? undefined,
-    address: salon.address ?? undefined,
+    address: seoText(salon.address),
     image: salon.coverUrl ?? undefined,
     aggregateRating: data.rating
       ? { "@type": "AggregateRating", ratingValue: data.rating.average, reviewCount: data.rating.count }

@@ -3,6 +3,7 @@ import { join, sep } from "node:path";
 import { ImageResponse } from "next/og";
 
 import { BRAND } from "@/lib/brand";
+import { seoText } from "@/lib/seo";
 import { brandMarkDataUrl } from "@/lib/server/brandMark";
 import { getActiveSalon } from "@/lib/server/salon";
 import { isThemeId, resolveAccent } from "@/lib/themes";
@@ -94,7 +95,9 @@ export default async function SalonOgImage({ params }: { params: Promise<{ slug:
   ]);
   const display = font ? "Bricolage" : undefined;
 
-  const name = salon?.name ?? BRAND.name;
+  const name = seoText(salon?.name) ?? BRAND.name;
+  const tagline = seoText(salon?.tagline);
+  const address = seoText(salon?.address);
   const accent = resolveAccent(salon && isThemeId(salon.theme) ? salon.theme : "SPA", salon?.accentColor);
 
   return new ImageResponse(
@@ -130,15 +133,15 @@ export default async function SalonOgImage({ params }: { params: Promise<{ slug:
             <div style={{ fontSize: name.length > 22 ? 62 : 76, fontWeight: 800, fontFamily: display, lineHeight: 1.05, lineClamp: 2, display: "block" }}>
               {name}
             </div>
-            {salon?.tagline && (
-              <div style={{ marginTop: 18, fontSize: 30, opacity: 0.75, lineClamp: 2, display: "block" }}>{salon.tagline}</div>
+            {tagline && (
+              <div style={{ marginTop: 18, fontSize: 30, opacity: 0.75, lineClamp: 2, display: "block" }}>{tagline}</div>
             )}
-            {salon?.address && (
+            {address && (
               <div style={{ marginTop: 36, display: "flex", alignItems: "flex-start", gap: 14 }}>
                 <div style={{ display: "flex", marginTop: 2 }}>
                   <PinIcon color={PLUM} />
                 </div>
-                <div style={{ fontSize: 32, lineHeight: 1.3, lineClamp: 3, display: "block", flex: 1 }}>{salon.address}</div>
+                <div style={{ fontSize: 32, lineHeight: 1.3, lineClamp: 3, display: "block", flex: 1 }}>{address}</div>
               </div>
             )}
           </div>

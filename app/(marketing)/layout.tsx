@@ -16,7 +16,7 @@ const chunky = Bricolage_Grotesque({ subsets: ["latin"], display: "swap", variab
 const text = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--font-marketing" });
 
 export const metadata: Metadata = {
-  title: { default: `${BRAND.name} — ${BRAND.tagline}`, template: `%s | ${BRAND.name}` },
+  title: { default: `${BRAND.name}: ${BRAND.tagline}`, template: `%s | ${BRAND.name}` },
   description: BRAND.description,
   openGraph: { title: BRAND.name, description: BRAND.description, type: "website" },
 };

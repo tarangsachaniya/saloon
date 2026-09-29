@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 
 import { SalonProvider } from "@/lib/salon/SalonContext";
+import { seoText } from "@/lib/seo";
 import { getActiveSalon } from "@/lib/server/salon";
 import { themeFontClasses } from "@/lib/themeFonts";
 import { isThemeId, resolveAccent, themeStyle, type ThemeId } from "@/lib/themes";
@@ -28,16 +29,18 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { slug } = await params;
   const salon = await getActiveSalon(slug);
   if (!salon) return { title: "Salon not found" };
+  const name = seoText(salon.name);
+  const tagline = seoText(salon.tagline);
   return {
-    title: { default: salon.name, template: `%s | ${salon.name}` },
-    description: salon.tagline ?? `Book an appointment at ${salon.name}.`,
+    title: { default: name, template: `%s | ${name}` },
+    description: tagline ?? `Book an appointment at ${name}.`,
     // The share image comes from `opengraph-image.tsx` (logo + address).
     openGraph: {
-      title: salon.name,
-      description: salon.tagline ?? undefined,
+      title: name,
+      description: tagline,
       type: "website",
     },
-    twitter: { card: "summary_large_image", title: salon.name, description: salon.tagline ?? undefined },
+    twitter: { card: "summary_large_image", title: name, description: tagline },
   };
 }
 
