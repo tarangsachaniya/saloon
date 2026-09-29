@@ -3,49 +3,67 @@ import "server-only";
 import prisma from "./prisma";
 import type { SalonSettings } from "@/lib/booking/types";
 
-/** Port of `loadSettings` in `backend/controller/settingsController.js`. */
+/**
+ * Per-salon settings.
+ *
+ * Storage is split — profile fields live on `Salon`, booking policy on
+ * `SalonSettings` — but the wire shape the frontend reads is still ONE merged
+ * `settings` object plus `openingHours`, so `lib/api/settings.ts` and the
+ * booking UI are unaffected.
+ */
 
-export const SETTINGS_ID = 1;
+/** Fields that belong to the `Salon` profile (name/logo/contact). `logo` -> `Salon.logoUrl`. */
+export const PROFILE_FIELDS = ["name", "phone", "email", "address", "mapUrl"] as const;
 
-export const SETTINGS_FIELDS = [
-  "name",
-  "logo",
-  "phone",
-  "email",
-  "address",
+/** Fields that belong to `SalonSettings` (booking policy). */
+export const POLICY_FIELDS = [
   "slotIntervalMinutes",
   "minimumAdvanceBookingMinutes",
   "maximumAdvanceBookingDays",
   "cancellationWindowMinutes",
 ] as const;
 
-export async function loadSettings() {
-  const [settings, openingHours] = await Promise.all([
-    prisma.salonSettings.findUnique({ where: { id: SETTINGS_ID } }),
-    prisma.salonOpeningHour.findMany({ orderBy: { weekday: "asc" } }),
+const POLICY_DEFAULTS = {
+  slotIntervalMinutes: 15,
+  minimumAdvanceBookingMinutes: 30,
+  maximumAdvanceBookingDays: 30,
+  cancellationWindowMinutes: 60,
+};
+
+export async function loadSettings(salonId: string) {
+  const [salon, policy, openingHours] = await Promise.all([
+    prisma.salon.findUnique({ where: { id: salonId } }),
+    prisma.salonSettings.findUnique({ where: { salonId } }),
+    prisma.salonOpeningHour.findMany({ where: { salonId }, orderBy: { weekday: "asc" } }),
   ]);
+
+  if (!salon) return { settings: null, openingHours };
+
+  const p = policy ?? POLICY_DEFAULTS;
+  const settings = {
+    name: salon.name,
+    logo: salon.logoUrl,
+    phone: salon.phone,
+    email: salon.email,
+    address: salon.address,
+    mapUrl: salon.mapUrl ?? null,
+    slotIntervalMinutes: p.slotIntervalMinutes,
+    minimumAdvanceBookingMinutes: p.minimumAdvanceBookingMinutes,
+    maximumAdvanceBookingDays: p.maximumAdvanceBookingDays,
+    cancellationWindowMinutes: p.cancellationWindowMinutes,
+  };
   return { settings, openingHours };
 }
 
 /**
- * The merged `{...settings, openingHours}` shape that `lib/api/settings.ts`
- * builds for its callers — for Server Components reading Prisma directly.
- * Returns null when the salon has not been configured, matching the 404 the
- * HTTP route answers in that case.
+ * The merged `{...settings, openingHours}` shape for Server Components reading
+ * Prisma directly. Null when the salon does not exist.
  */
-export async function getSalonSettingsView(): Promise<SalonSettings | null> {
-  const { settings, openingHours } = await loadSettings();
+export async function getSalonSettingsView(salonId: string): Promise<SalonSettings | null> {
+  const { settings, openingHours } = await loadSettings(salonId);
   if (!settings) return null;
   return {
-    name: settings.name,
-    logo: settings.logo,
-    phone: settings.phone,
-    email: settings.email,
-    address: settings.address,
-    slotIntervalMinutes: settings.slotIntervalMinutes,
-    minimumAdvanceBookingMinutes: settings.minimumAdvanceBookingMinutes,
-    maximumAdvanceBookingDays: settings.maximumAdvanceBookingDays,
-    cancellationWindowMinutes: settings.cancellationWindowMinutes,
+    ...settings,
     openingHours: openingHours.map((hour) => ({
       weekday: hour.weekday,
       isOpen: hour.isOpen,

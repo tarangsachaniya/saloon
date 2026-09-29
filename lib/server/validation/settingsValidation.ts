@@ -22,6 +22,7 @@ export const updateSettingsBodySchema = z
     phone: z.string().max(30).optional().nullable(),
     email: z.email().max(180).optional().nullable(),
     address: z.string().max(500).optional().nullable(),
+    mapUrl: z.string().max(2000).optional().nullable(),
     slotIntervalMinutes: z.number().int().min(5).max(120).optional(),
     minimumAdvanceBookingMinutes: z.number().int().min(0).max(10080).optional(),
     maximumAdvanceBookingDays: z.number().int().min(1).max(365).optional(),

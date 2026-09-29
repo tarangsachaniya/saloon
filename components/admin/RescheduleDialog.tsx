@@ -14,7 +14,7 @@ import {
   Loader,
   Select,
 } from "@/components/ui";
-import { getBarberAvailability, updateAppointment } from "@/lib/api";
+import { getAdminBarberAvailability, updateAppointment } from "@/lib/api";
 import { toErrorMessage, useAdminData } from "@/lib/admin/useAdminData";
 import type {
   Appointment,
@@ -159,7 +159,7 @@ function RescheduleForm({
   } = useAdminData<AvailabilityResponse | null>(
     (signal) =>
       serviceId && barberId && date
-        ? getBarberAvailability(
+        ? getAdminBarberAvailability(
             barberId,
             // Tell the server we are MOVING this appointment, so it does not
             // count against its own availability.

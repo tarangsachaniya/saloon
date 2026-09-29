@@ -1,5 +1,5 @@
-// Integration test for the double-booking guarantee, against the REAL local
-// Postgres database (`barber_dev` via DATABASE_URL).
+// Integration test for the double-booking guarantee, against the REAL Postgres
+// database in DATABASE_URL.
 //
 // Ported from `backend/test/doubleBooking.test.js`. The one structural change:
 // the Express version drove the API with supertest against `app`. There is no
@@ -9,24 +9,24 @@
 // invocations raced with `Promise.all`, both hitting Postgres through the same
 // PrismaClient, exactly as two simultaneous HTTP requests would.
 //
-// It creates its own clearly-marked `test-` fixtures and removes exactly those
-// rows in afterAll - it never runs a blanket deleteMany(), so the seeded demo
-// data is left untouched.
+// It creates its own throwaway `test-` SALON (with settings, hours, service,
+// barber, owner) and removes exactly those rows in afterAll - it never runs a
+// blanket deleteMany(), so real salons are left untouched.
 
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { NextRequest } from "next/server";
-import type { Barber, Service, User } from "@prisma/client";
+import type { Barber, Salon, Service, User } from "@prisma/client";
 
 import prisma from "@/lib/server/prisma";
 import { isExclusionViolation, SLOT_TAKEN_MESSAGE } from "@/lib/server/dbErrors";
 import { toDateString, parseDateOnly, minutesToHHMM } from "@/lib/server/availability";
 import { hashSync } from "@/lib/server/password";
 
-import { POST as postAppointment } from "@/app/api/appointments/route";
+import { POST as postAppointment } from "@/app/api/s/[slug]/appointments/route";
 import { POST as postLogin } from "@/app/api/auth/login/route";
-import { GET as getAdminAppointments } from "@/app/api/admin/appointments/route";
-import { PATCH as patchAdminAppointment } from "@/app/api/admin/appointments/[id]/route";
-import { GET as getBarberAvailability } from "@/app/api/barbers/[id]/availability/route";
+import { GET as getAdminAppointments } from "@/app/api/dashboard/appointments/route";
+import { PATCH as patchAdminAppointment } from "@/app/api/dashboard/appointments/[id]/route";
+import { GET as getBarberAvailability } from "@/app/api/s/[slug]/barbers/[id]/availability/route";
 
 const ORIGIN = "http://localhost:3000";
 
@@ -36,6 +36,7 @@ const RUN = `test-${Date.now()}`;
 const PHONE = `t${String(Date.now()).slice(-9)}`;
 const OWNER_PASSWORD = "TestOwner123!";
 
+let salon: Salon;
 let service: Service;
 let barber: Barber;
 let owner: User;
@@ -58,7 +59,12 @@ function req(
 
 /** `{ params }` as the App Router passes it — a PROMISE in this Next.js version. */
 function ctx(id: string) {
-  return { params: Promise.resolve({ id }) };
+  return { params: Promise.resolve({ slug: salon.slug, id }) };
+}
+
+/** `{ params }` for routes with only the `[slug]` segment. */
+function slugCtx() {
+  return { params: Promise.resolve({ slug: salon.slug }) };
 }
 
 async function readJson(response: Response) {
@@ -81,25 +87,40 @@ function bookingBody(overrides: Record<string, unknown> = {}) {
     startTime: "11:00",
     customerName: "Race Tester",
     customerPhone: `${PHONE}-p0`,
+    consent: true,
     ...overrides,
   };
 }
 
 const book = (overrides: Record<string, unknown> = {}) =>
-  postAppointment(req("/api/appointments", { method: "POST", body: bookingBody(overrides) })).then(
-    readJson,
-  );
+  postAppointment(
+    req(`/api/s/${salon.slug}/appointments`, { method: "POST", body: bookingBody(overrides) }),
+    slugCtx(),
+  ).then(readJson);
 
 beforeAll(async () => {
-  const settings = await prisma.salonSettings.findUnique({ where: { id: 1 } });
-  if (!settings) {
-    throw new Error("No SalonSettings row found - seed barber_dev first.");
-  }
+  salon = await prisma.salon.create({
+    data: {
+      slug: RUN,
+      name: `${RUN} salon`,
+      settings: { create: {} },
+      // Open every day 09:00-21:00 so the fixture does not depend on the weekday.
+      openingHours: {
+        create: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+          weekday,
+          isOpen: true,
+          openTime: 540,
+          closeTime: 1260,
+        })),
+      },
+    },
+  });
 
   bookingDate = pickOpenDate(3);
 
   service = await prisma.service.create({
     data: {
+      salonId: salon.id,
       name: `${RUN}-service`,
       description: "Throwaway integration-test service",
       price: 100,
@@ -109,11 +130,10 @@ beforeAll(async () => {
     },
   });
 
-  // Works every weekday 09:00-21:00 so the fixture does not depend on which
-  // day of the week the test happens to run on; the salon's own hours still
-  // narrow the effective window.
+  // Works every weekday 09:00-21:00.
   barber = await prisma.barber.create({
     data: {
+      salonId: salon.id,
       name: `${RUN}-barber`,
       email: `${RUN}@example.test`,
       specializations: [],
@@ -137,6 +157,7 @@ beforeAll(async () => {
       email: `${RUN}@example.test`,
       password: hashSync(OWNER_PASSWORD),
       role: "OWNER",
+      salonId: salon.id,
       enabled: true,
     },
   });
@@ -155,18 +176,22 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Targeted cleanup only - never a blanket deleteMany().
-  if (barber) await prisma.appointment.deleteMany({ where: { barberId: barber.id } });
-  await prisma.client.deleteMany({ where: { phone: { startsWith: PHONE } } });
-  if (barber) await prisma.barber.delete({ where: { id: barber.id } }).catch(() => {});
-  if (service) await prisma.service.delete({ where: { id: service.id } }).catch(() => {});
-  if (owner) await prisma.user.delete({ where: { id: owner.id } }).catch(() => {});
+  // Targeted cleanup only, scoped to the throwaway salon.
+  if (salon) {
+    await prisma.appointment.deleteMany({ where: { salonId: salon.id } });
+    await prisma.client.deleteMany({ where: { salonId: salon.id } });
+    await prisma.user.deleteMany({ where: { salonId: salon.id } });
+    await prisma.barber.deleteMany({ where: { salonId: salon.id } });
+    await prisma.service.deleteMany({ where: { salonId: salon.id } });
+    await prisma.salon.delete({ where: { id: salon.id } }).catch(() => {});
+  }
   await prisma.$disconnect();
 });
 
 describe("the Postgres exclusion constraint itself", () => {
   test("two concurrent overlapping inserts: exactly one survives, the other raises 23P01", async () => {
     const base = {
+      salonId: salon.id,
       barberId: barber.id,
       serviceId: service.id,
       appointmentDate: parseDateOnly(bookingDate),
@@ -175,7 +200,7 @@ describe("the Postgres exclusion constraint itself", () => {
       status: "CONFIRMED" as const,
     };
     const client = await prisma.client.create({
-      data: { name: "Raw Race", phone: `${PHONE}-raw` },
+      data: { salonId: salon.id, name: "Raw Race", phone: `${PHONE}-raw` },
     });
 
     const results = await Promise.allSettled([
@@ -196,7 +221,7 @@ describe("the Postgres exclusion constraint itself", () => {
   });
 });
 
-describe("POST /api/appointments concurrency", () => {
+describe("POST /api/s/[slug]/appointments concurrency", () => {
   test("two simultaneous bookings for the same barber/slot: one wins, one is told the slot is gone", async () => {
     const [first, second] = await Promise.all([
       book({ customerPhone: `${PHONE}-a` }),
@@ -260,7 +285,7 @@ describe("POST /api/appointments concurrency", () => {
     });
     expect(second.status).toBe(201);
 
-    const clients = await prisma.client.findMany({ where: { phone } });
+    const clients = await prisma.client.findMany({ where: { salonId: salon.id, phone } });
     expect(clients).toHaveLength(1);
     expect(clients[0].totalVisits).toBe(2);
     expect(second.body.appointment.clientId).toBe(first.body.appointment.clientId);
@@ -282,7 +307,7 @@ describe("cancelling frees the slot", () => {
 
     const cancelled = await readJson(
       await patchAdminAppointment(
-        req(`/api/admin/appointments/${appointmentId}`, {
+        req(`/api/dashboard/appointments/${appointmentId}`, {
           method: "PATCH",
           token,
           body: { status: "CANCELLED" },
@@ -304,14 +329,14 @@ describe("cancelling frees the slot", () => {
 
 describe("admin routes are actually protected", () => {
   test("no token is rejected", async () => {
-    const res = await readJson(await getAdminAppointments(req("/api/admin/appointments")));
+    const res = await readJson(await getAdminAppointments(req("/api/dashboard/appointments")));
     expect(res.status).toBe(401);
   });
 
   test("a valid owner token is accepted", async () => {
     const res = await readJson(
       await getAdminAppointments(
-        req(`/api/admin/appointments?date=${bookingDate}`, { token }),
+        req(`/api/dashboard/appointments?date=${bookingDate}`, { token }),
       ),
     );
     expect(res.status).toBe(200);
@@ -327,13 +352,13 @@ describe("admin routes are actually protected", () => {
  * admin reschedule dialog was told fewer slots were free than the server would
  * actually accept.
  */
-describe("excludeAppointmentId on GET /api/barbers/:id/availability", () => {
+describe("excludeAppointmentId on GET /api/s/[slug]/barbers/:id/availability", () => {
   test("without it an appointment blocks its own slot; with it, that slot and every slot it overlaps are free again", async () => {
     const booked = await book({ startTime: "16:00", customerPhone: `${PHONE}-x` });
     expect(booked.status).toBe(201);
     const appointmentId = booked.body.appointment.id;
 
-    const base = `/api/barbers/${barber.id}/availability?serviceId=${service.id}&date=${bookingDate}`;
+    const base = `/api/s/${salon.slug}/barbers/${barber.id}/availability?serviceId=${service.id}&date=${bookingDate}`;
 
     const without = await readJson(
       await getBarberAvailability(req(base), ctx(barber.id)),
@@ -368,7 +393,7 @@ describe("excludeAppointmentId on GET /api/barbers/:id/availability", () => {
     // appointment's own current time) is accepted.
     const moved = await readJson(
       await patchAdminAppointment(
-        req(`/api/admin/appointments/${appointmentId}`, {
+        req(`/api/dashboard/appointments/${appointmentId}`, {
           method: "PATCH",
           token,
           body: {

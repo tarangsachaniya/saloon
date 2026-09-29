@@ -7,7 +7,7 @@ import type {
 import type { RequestOptions } from "./client";
 
 /**
- * `GET /api/availability?serviceId=&barberId=&date=&excludeAppointmentId=`
+ * `GET /api/s/:slug/availability?serviceId=&barberId=&date=&excludeAppointmentId=`
  *
  * `barberId` may be a concrete id or the literal "any" (see `ANY_BARBER`).
  * `date` must be "YYYY-MM-DD".
@@ -22,10 +22,11 @@ import type { RequestOptions } from "./client";
  * parameter exists here for parity (an "any barber" reschedule).
  */
 export function getAvailability(
+  salonSlug: string,
   params: AvailabilityQuery & { excludeAppointmentId?: string },
   options?: RequestOptions,
 ): Promise<AvailabilityResponse> {
-  return get<AvailabilityResponse>("/availability", {
+  return get<AvailabilityResponse>(`/s/${encodeURIComponent(salonSlug)}/availability`, {
     auth: false,
     ...options,
     query: {

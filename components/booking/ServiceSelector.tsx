@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { getServices } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
+import { useSalon } from "@/lib/salon/SalonContext";
 import type { Service } from "@/lib/booking/types";
 import { Badge, EmptyState, Loader } from "@/components/ui";
 import { formatPrice } from "@/lib/utils/format";
@@ -15,10 +16,11 @@ import { useAsync } from "./useAsync";
 export function ServiceSelector({ onSelected }: { onSelected: () => void }) {
   const { service: selected, selectService } = useBooking();
   const [activeCategory, setActiveCategory] = useState<string>("all");
+  const { slug } = useSalon();
 
   const { data, error, isLoading, reload } = useAsync(
-    (signal) => getServices({ signal }),
-    [],
+    (signal) => getServices(slug, { signal }),
+    [slug],
   );
 
   const categories = useMemo(() => {

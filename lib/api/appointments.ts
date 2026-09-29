@@ -12,7 +12,7 @@ import type { RequestOptions } from "./client";
 /* ----------------------------- Public (customer) ---------------------------- */
 
 /**
- * `POST /api/appointments` — create a booking.
+ * `POST /api/s/:slug/appointments` — create a booking at a salon.
  *
  * Returns the API's discriminated union rather than throwing on a business
  * failure, because "this slot was just taken" is an expected outcome the wizard
@@ -23,11 +23,12 @@ import type { RequestOptions } from "./client";
  * The `message` is opaque — display it, never branch on its text.
  */
 export async function createAppointment(
+  salonSlug: string,
   payload: CreateAppointmentPayload,
   options?: RequestOptions,
 ): Promise<CreateAppointmentResult> {
   try {
-    const result = await post<CreateAppointmentResult>("/appointments", payload, {
+    const result = await post<CreateAppointmentResult>(`/s/${encodeURIComponent(salonSlug)}/appointments`, payload, {
       auth: false,
       ...options,
     });
@@ -56,7 +57,7 @@ export async function createAppointment(
 /* --------------------------------- Admin ---------------------------------- */
 
 /**
- * `GET /api/admin/appointments?date=&from=&to=&barberId=&status=`
+ * `GET /api/dashboard/appointments?date=&from=&to=&barberId=&status=`
  *
  * `from`/`to` give an inclusive date range; the backend ignores them whenever
  * `date` is supplied. Results come back ordered by date then start time.
@@ -66,7 +67,7 @@ export async function getAdminAppointments(
   options?: RequestOptions,
 ): Promise<Appointment[]> {
   const data = await get<{ success: true; appointments: Appointment[] }>(
-    "/admin/appointments",
+    "/dashboard/appointments",
     {
       ...options,
       query: {
@@ -82,26 +83,26 @@ export async function getAdminAppointments(
   return data.appointments.map(normalizeAppointment);
 }
 
-/** `GET /api/admin/appointments/:id` */
+/** `GET /api/dashboard/appointments/:id` */
 export async function getAdminAppointment(
   id: string,
   options?: RequestOptions,
 ): Promise<Appointment> {
   const data = await get<{ success: true; appointment: Appointment }>(
-    `/admin/appointments/${encodeURIComponent(id)}`,
+    `/dashboard/appointments/${encodeURIComponent(id)}`,
     options,
   );
   return normalizeAppointment(data.appointment);
 }
 
-/** `PATCH /api/admin/appointments/:id` — status changes, reschedules, notes. */
+/** `PATCH /api/dashboard/appointments/:id` — status changes, reschedules, notes. */
 export async function updateAppointment(
   id: string,
   payload: UpdateAppointmentPayload,
   options?: RequestOptions,
 ): Promise<Appointment> {
   const data = await patch<{ success: true; appointment: Appointment }>(
-    `/admin/appointments/${encodeURIComponent(id)}`,
+    `/dashboard/appointments/${encodeURIComponent(id)}`,
     payload,
     options,
   );

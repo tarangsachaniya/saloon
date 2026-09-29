@@ -7,20 +7,25 @@ import prisma from "./prisma";
 import { validateToken } from "./jwt";
 
 /**
- * Port of `backend/middleware/adminMiddleware.js`.
+ * Multi-salon auth.
  *
- * Single-salon auth: one `Authorization: Bearer <token>` header, one User
- * table, two roles. Express middleware becomes two helpers a Route Handler
- * calls explicitly:
+ * One `Authorization: Bearer <token>` header, one User table, three roles:
  *
- *   const auth = await requireAdmin(request);   // hard gate  (was `verification`)
- *   if ('error' in auth) return auth.error;
- *   const { user } = auth;
+ *   SUPER_ADMIN  platform operator; has no salon (`salonId` null)
+ *   OWNER/STAFF  bound to exactly ONE salon via `user.salonId`
  *
- *   const user = await getOptionalUser(request); // soft gate (was `optional`)
+ * TENANCY RULE: the salon a dashboard request acts on always comes from the
+ * verified user row here, never from the URL or body. `requireAdmin` hands the
+ * caller a `salonId` it must put in every query's `where`.
+ *
+ *   const auth = await requireAdmin(request);   // salon staff gate
+ *   if ("error" in auth) return auth.error;
+ *   const { user, salonId } = auth;
+ *
+ *   const auth = await requireSuperAdmin(request); // platform gate
  */
 
-export const ALLOWED_ROLES = ["OWNER", "STAFF"] as const;
+export const SALON_ROLES = ["OWNER", "STAFF"] as const;
 
 export function readBearerToken(request: Request): string | null {
   const header = request.headers.get("authorization") || "";
@@ -28,6 +33,7 @@ export function readBearerToken(request: Request): string | null {
   return match ? match[1].trim() : null;
 }
 
+/** Any enabled user (any role) behind a valid token. */
 async function loadUserFromRequest(request: Request): Promise<User | null> {
   const token = readBearerToken(request);
   if (!token) return null;
@@ -36,40 +42,90 @@ async function loadUserFromRequest(request: Request): Promise<User | null> {
   if (!decoded || !decoded.id) return null;
 
   const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-  if (!user || !user.enabled || !ALLOWED_ROLES.includes(user.role)) return null;
+  if (!user || !user.enabled) return null;
   return user;
 }
 
-export type AdminGate = { user: User } | { error: NextResponse };
+/** Salon staff only, and only while their salon is active. */
+async function loadSalonStaff(request: Request): Promise<(User & { salonId: string }) | null> {
+  const user = await loadUserFromRequest(request);
+  if (!user || !user.salonId) return null;
+  if (!SALON_ROLES.includes(user.role as (typeof SALON_ROLES)[number])) return null;
 
-/** Hard gate for every admin route. 401s exactly like the Express version. */
-export async function requireAdmin(request: Request): Promise<AdminGate> {
+  const salon = await prisma.salon.findUnique({
+    where: { id: user.salonId },
+    select: { isActive: true },
+  });
+  if (!salon || !salon.isActive) return null;
+  return user as User & { salonId: string };
+}
+
+const unauthorized = () =>
+  NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+const forbidden = () =>
+  NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+const serverError = () =>
+  NextResponse.json({ success: false, message: "Something went wrong." }, { status: 500 });
+
+export type StaffGate = { user: User; salonId: string } | { error: NextResponse };
+
+/** Hard gate for every salon-dashboard route. */
+export async function requireAdmin(request: Request): Promise<StaffGate> {
+  try {
+    const user = await loadSalonStaff(request);
+    if (!user) return { error: unauthorized() };
+    return { user, salonId: user.salonId };
+  } catch (error) {
+    console.error("[auth] failed to load user:", error);
+    return { error: serverError() };
+  }
+}
+
+/** OWNER-only actions inside a salon (policies, billing view, staff, data export). */
+export async function requireOwner(request: Request): Promise<StaffGate> {
+  const gate = await requireAdmin(request);
+  if ("error" in gate) return gate;
+  if (gate.user.role !== "OWNER") return { error: forbidden() };
+  return gate;
+}
+
+export type PlatformGate = { user: User } | { error: NextResponse };
+
+/** Hard gate for `/api/platform/*`. */
+export async function requireSuperAdmin(request: Request): Promise<PlatformGate> {
   try {
     const user = await loadUserFromRequest(request);
-    if (!user) {
-      return {
-        error: NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 }),
-      };
-    }
+    if (!user) return { error: unauthorized() };
+    if (user.role !== "SUPER_ADMIN") return { error: forbidden() };
     return { user };
   } catch (error) {
     console.error("[auth] failed to load user:", error);
-    return {
-      error: NextResponse.json(
-        { success: false, message: "Something went wrong." },
-        { status: 500 },
-      ),
-    };
+    return { error: serverError() };
+  }
+}
+
+/** Any signed-in user of any role (used by `/api/auth/me`). */
+export async function requireUser(request: Request): Promise<PlatformGate> {
+  try {
+    const user = await loadUserFromRequest(request);
+    if (!user) return { error: unauthorized() };
+    return { user };
+  } catch (error) {
+    console.error("[auth] failed to load user:", error);
+    return { error: serverError() };
   }
 }
 
 /**
- * Soft gate for endpoints that are public but behave differently for staff
- * (e.g. `GET /api/services?includeInactive=true`). Never rejects.
+ * Soft gate for public endpoints that behave differently for a salon's own
+ * staff (e.g. `?includeInactive=true`). Returns the user ONLY if they belong
+ * to `salonId` — staff of salon A get no special treatment on salon B's page.
+ * Never rejects.
  */
-export async function getOptionalUser(request: Request): Promise<User | null> {
+export async function getOptionalStaff(request: Request, salonId: string): Promise<User | null> {
   try {
-    return await loadUserFromRequest(request);
+    const user = await loadSalonStaff(request);
+    return user && user.salonId === salonId ? user : null;
   } catch {
     return null;
   }

@@ -379,11 +379,13 @@ export class AvailabilityError extends Error {
  * `excludeAppointmentId` lets a reschedule ignore the row being moved.
  */
 export async function loadContext({
+  salonId,
   serviceId,
   barberId = "any",
   date,
   excludeAppointmentId = null,
 }: {
+  salonId: string;
   serviceId: string;
   barberId?: string;
   date: string;
@@ -393,9 +395,9 @@ export async function loadContext({
   const dayDate = parseDateOnly(date);
 
   const [salonSettings, openingHour, service] = await Promise.all([
-    prisma.salonSettings.findUnique({ where: { id: 1 } }),
-    prisma.salonOpeningHour.findUnique({ where: { weekday } }),
-    prisma.service.findUnique({ where: { id: serviceId } }),
+    prisma.salonSettings.findUnique({ where: { salonId } }),
+    prisma.salonOpeningHour.findUnique({ where: { salonId_weekday: { salonId, weekday } } }),
+    prisma.service.findFirst({ where: { id: serviceId, salonId } }),
   ]);
 
   if (!salonSettings) throw new AvailabilityError("Salon settings have not been configured.", 500);
@@ -404,10 +406,10 @@ export async function loadContext({
   const wantsAny = !barberId || barberId === "any";
   const barbers = wantsAny
     ? await prisma.barber.findMany({
-        where: { isActive: true, services: { some: { id: serviceId } } },
+        where: { salonId, isActive: true, services: { some: { id: serviceId } } },
         orderBy: { id: "asc" },
       })
-    : await prisma.barber.findMany({ where: { id: barberId }, orderBy: { id: "asc" } });
+    : await prisma.barber.findMany({ where: { id: barberId, salonId }, orderBy: { id: "asc" } });
 
   if (!wantsAny && barbers.length === 0) throw new AvailabilityError("Barber not found.", 404);
 
@@ -425,6 +427,7 @@ export async function loadContext({
     barberIds.length
       ? prisma.appointment.findMany({
           where: {
+            salonId,
             barberId: { in: barberIds },
             appointmentDate: dayDate,
             status: { notIn: ["CANCELLED", "NO_SHOW"] },
@@ -450,19 +453,21 @@ export async function loadContext({
  * needs to know WHICH barber an "any" slot resolves to.
  */
 export async function computeAvailabilityDetailed({
+  salonId,
   serviceId,
   barberId = "any",
   date,
   now = new Date(),
   excludeAppointmentId = null,
 }: {
+  salonId: string;
   serviceId: string;
   barberId?: string;
   date: string;
   now?: Date;
   excludeAppointmentId?: string | null;
 }) {
-  const ctx = await loadContext({ serviceId, barberId, date, excludeAppointmentId });
+  const ctx = await loadContext({ salonId, serviceId, barberId, date, excludeAppointmentId });
   const { salonSettings, openingHour, service } = ctx;
 
   const check = validateBookingDate({ date, salonSettings, now });
@@ -501,6 +506,7 @@ export async function computeAvailabilityDetailed({
 
 /** Public-facing availability payload. */
 export async function computeAvailability(opts: {
+  salonId: string;
   serviceId: string;
   barberId?: string;
   date: string;
@@ -539,6 +545,7 @@ export type ResolveBookingResult =
  * - a taken slot yields the exact spec'd "This slot is no longer available."
  */
 export async function resolveBooking({
+  salonId,
   serviceId,
   barberId = "any",
   date,
@@ -546,6 +553,7 @@ export async function resolveBooking({
   now = new Date(),
   excludeAppointmentId = null,
 }: {
+  salonId: string;
   serviceId: string;
   barberId?: string;
   date: string;
@@ -561,6 +569,7 @@ export async function resolveBooking({
   let detailed: Awaited<ReturnType<typeof computeAvailabilityDetailed>>;
   try {
     detailed = await computeAvailabilityDetailed({
+      salonId,
       serviceId,
       barberId,
       date,
@@ -601,16 +610,18 @@ export async function resolveBooking({
 
 /** Thin alias kept for readability at the call site. */
 export async function resolveAnyBarber({
+  salonId,
   serviceId,
   date,
   startTime,
   now = new Date(),
 }: {
+  salonId: string;
   serviceId: string;
   date: string;
   startTime: unknown;
   now?: Date;
 }): Promise<string | null> {
-  const result = await resolveBooking({ serviceId, barberId: "any", date, startTime, now });
+  const result = await resolveBooking({ salonId, serviceId, barberId: "any", date, startTime, now });
   return result.ok ? result.barberId : null;
 }

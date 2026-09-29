@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { cn } from "@/lib/utils/cn";
 import { initials } from "@/lib/utils/format";
@@ -33,25 +33,23 @@ import {
  * template bolted on beside it.
  */
 
-const LOGIN_PATH = "/admin/login";
-
 interface NavItem {
   href: string;
   label: string;
   /** Shorter label for the cramped mobile tab bar. */
   shortLabel: string;
   Icon: typeof DashboardIcon;
-  /** `/admin` must match exactly or it would light up on every child route. */
+  /** `/dashboard` must match exactly or it would light up on every child route. */
   exact?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/admin", label: "Dashboard", shortLabel: "Today", Icon: DashboardIcon, exact: true },
-  { href: "/admin/appointments", label: "Appointments", shortLabel: "Diary", Icon: CalendarIcon },
-  { href: "/admin/barbers", label: "Barbers", shortLabel: "Barbers", Icon: ScissorsIcon },
-  { href: "/admin/services", label: "Services", shortLabel: "Services", Icon: TagIcon },
-  { href: "/admin/clients", label: "Clients", shortLabel: "Clients", Icon: UsersIcon },
-  { href: "/admin/settings", label: "Settings", shortLabel: "Settings", Icon: SettingsIcon },
+  { href: "/dashboard", label: "Dashboard", shortLabel: "Today", Icon: DashboardIcon, exact: true },
+  { href: "/dashboard/appointments", label: "Appointments", shortLabel: "Diary", Icon: CalendarIcon },
+  { href: "/dashboard/barbers", label: "Barbers", shortLabel: "Barbers", Icon: ScissorsIcon },
+  { href: "/dashboard/services", label: "Services", shortLabel: "Services", Icon: TagIcon },
+  { href: "/dashboard/clients", label: "Clients", shortLabel: "Clients", Icon: UsersIcon },
+  { href: "/dashboard/settings", label: "Settings", shortLabel: "Settings", Icon: SettingsIcon },
 ];
 
 function isActive(pathname: string, item: NavItem): boolean {
@@ -61,20 +59,24 @@ function isActive(pathname: string, item: NavItem): boolean {
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const router = useRouter();
+  const { user, token, isLoading, logout } = useAuth();
 
-  /*
-   * The login screen lives under /admin but must NOT get the chrome — it is the
-   * one admin route reachable while signed out, and wrapping a sign-in form in
-   * a navigation sidebar it cannot use would be nonsense. Handled here with a
-   * path check rather than a `(group)` layout so the route files stay exactly
-   * where the milestone brief (and anyone reading the tree) expects them.
-   */
-  if (pathname === LOGIN_PATH) {
-    return <>{children}</>;
-  }
+  // Route by role once the profile is known: the platform operator has no salon
+  // and lives under /platform; everyone else stays here. A cleared token (logout
+  // or an auto-clear after a 401) sends them back to /login.
+  useEffect(() => {
+    if (isLoading) return;
+    if (!token) {
+      router.replace(`/login?redirectTo=${encodeURIComponent(pathname)}`);
+    } else if (user?.role === "SUPER_ADMIN") {
+      router.replace("/platform");
+    }
+  }, [isLoading, token, user, pathname, router]);
 
-  const displayName = user ? `${user.firstName} ${user.lastName}`.trim() : "";
+  const displayName = user ? `${user.firstName} ${user.lastName ?? ""}`.trim() : "";
+  const salonName = user?.salonName ?? "Salon Admin";
+  const shopHref = user?.salonSlug ? `/s/${user.salonSlug}` : "/";
 
   return (
     <div className="min-h-dvh bg-surface-muted lg:flex">
@@ -82,7 +84,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-primary-800 bg-primary text-primary-foreground lg:flex">
         <div className="border-b border-white/10 px-5 py-5">
           <Link
-            href="/admin"
+            href="/dashboard"
             className="flex items-center gap-3 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-secondary-light"
           >
             <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400/25 via-amber-500/15 to-transparent border border-amber-400/40 shadow-inner">
@@ -107,7 +109,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 Back Office
               </span>
               <span className="block text-base font-extrabold leading-tight text-white truncate">
-                Salon Admin
+                {salonName}
               </span>
             </div>
           </Link>
@@ -140,11 +142,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
           <div className="mt-6 px-2">
             <Link
-              href="/"
+              href={shopHref}
               target="_blank"
               className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white transition-colors"
             >
-              <span>View Public Site</span>
+              <span>View my shop page</span>
               <span className="text-secondary-light">↗</span>
             </Link>
           </div>
@@ -185,14 +187,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
         {/* Mobile header */}
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-primary-800 bg-primary px-4 py-3 text-primary-foreground lg:hidden">
           <Link
-            href="/admin"
+            href="/dashboard"
             className="min-w-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-light"
           >
             <span className="block text-[10px] font-semibold uppercase tracking-widest text-secondary-light">
               Back office
             </span>
             <span className="block truncate text-base font-extrabold leading-tight text-white">
-              Salon admin
+              {salonName}
             </span>
           </Link>
           <div className="flex items-center gap-2">

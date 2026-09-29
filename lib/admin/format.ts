@@ -9,8 +9,8 @@ import { fromDateString, WEEKDAY_LABELS } from "@/lib/utils/time";
  * data the RUNTIME happens to have. Node and Chromium ship different ICU
  * versions, so the same timestamp prerenders as "Fri, 18 Sept 2026" on the
  * server and hydrates as "Fri, 18 Sept, 2026" in the browser — a real hydration
- * mismatch, observed in a headless browser on a hard load of `/admin` and
- * `/admin/appointments`, where the date sits in the page header and is
+ * mismatch, observed in a headless browser on a hard load of `/dashboard` and
+ * `/dashboard/appointments`, where the date sits in the page header and is
  * therefore rendered during SSR rather than after a client-side fetch.
  *
  * `formatDateLong` stays exactly as it is: on the customer-facing booking flow,

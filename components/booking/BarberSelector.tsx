@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { getBarbers } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
+import { useSalon } from "@/lib/salon/SalonContext";
 import type { Barber } from "@/lib/booking/types";
 import { Badge, EmptyState, Loader } from "@/components/ui";
 import { getBarberPhotoUrl } from "@/lib/utils/barberImages";
@@ -39,14 +40,15 @@ export function BarberAvatar({
 export function BarberSelector({ onSelected }: { onSelected: () => void }) {
   const { service, barber: selected, isAnyBarber, selectBarber, selectAnyBarber } =
     useBooking();
+  const { slug } = useSalon();
   const serviceId = service?.id ?? null;
 
   const { data, error, isLoading, reload } = useAsync(
     (signal) =>
       serviceId
-        ? getBarbers(serviceId, { signal })
+        ? getBarbers(slug, serviceId, { signal })
         : Promise.resolve<Barber[]>([]),
-    [serviceId],
+    [slug, serviceId],
   );
 
   function chooseAny() {

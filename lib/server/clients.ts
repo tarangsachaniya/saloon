@@ -7,11 +7,11 @@ import prisma from "./prisma";
  *
  * Clients are the salon's CRM records. They are never created through a public
  * route - this is called from the booking flow, which de-duplicates repeat
- * customers on their phone number: one client row per phone number, and
+ * customers on their phone number: one client row per (salon, phone number), and
  * re-booking under a new name/email updates the existing record.
  */
 export async function upsertClientByPhone(
-  { name, phone, email }: { name: unknown; phone: unknown; email?: unknown },
+  { salonId, name, phone, email }: { salonId: string; name: unknown; phone: unknown; email?: unknown },
   tx: Pick<typeof prisma, "client"> = prisma,
 ) {
   const cleanPhone = String(phone).trim();
@@ -19,8 +19,8 @@ export async function upsertClientByPhone(
   const cleanEmail = email ? String(email).trim() : null;
 
   return tx.client.upsert({
-    where: { phone: cleanPhone },
+    where: { salonId_phone: { salonId, phone: cleanPhone } },
     update: { name: cleanName, ...(cleanEmail ? { email: cleanEmail } : {}) },
-    create: { name: cleanName, phone: cleanPhone, email: cleanEmail },
+    create: { salonId, name: cleanName, phone: cleanPhone, email: cleanEmail },
   });
 }

@@ -108,3 +108,35 @@ export function handleRouteError(error: unknown): NextResponse {
     { status: err && err.status ? err.status : 500 },
   );
 }
+
+/**
+ * Strict JSON body parsing for newer routes: returns Zod's PARSED output
+ * (trimmed, typed) and, on failure, a 400 listing each field's problem so a
+ * form can show it next to the input:
+ *   { success: false, message, fieldErrors: { "owner.email": "Invalid email" } }
+ */
+export async function parseJsonStrict<S extends ZodType>(
+  request: Request,
+  schema: S,
+): Promise<{ data: import("zod").infer<S> } | { error: NextResponse }> {
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    raw = {};
+  }
+  const result = await schema.safeParseAsync(raw ?? {});
+  if (result.success) return { data: result.data };
+
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path.join(".") || "_";
+    if (!(key in fieldErrors)) fieldErrors[key] = issue.message;
+  }
+  return {
+    error: NextResponse.json(
+      { success: false, message: "Please check the highlighted fields.", fieldErrors },
+      { status: 400 },
+    ),
+  };
+}

@@ -4,7 +4,7 @@ import type { Client } from "@/lib/booking/types";
 import type { RequestOptions } from "./client";
 
 /**
- * `GET /api/admin/clients?q=` — search the client directory.
+ * `GET /api/dashboard/clients?q=` — search the client directory.
  * `q` matches name or phone server-side; omit it for the full list.
  */
 export async function getClients(
@@ -12,7 +12,7 @@ export async function getClients(
   options?: RequestOptions,
 ): Promise<Client[]> {
   const data = await get<{ success: true; clients: Client[] }>(
-    "/admin/clients",
+    "/dashboard/clients",
     {
       ...options,
       query: { q, ...options?.query },
@@ -22,7 +22,7 @@ export async function getClients(
 }
 
 /**
- * `GET /api/admin/clients/:id` — the client record plus their full
+ * `GET /api/dashboard/clients/:id` — the client record plus their full
  * appointment history. The backend returns `{client, appointments}` as
  * siblings; this merges them into one object matching `Client.appointments`.
  *
@@ -40,7 +40,7 @@ export async function getClient(
     success: true;
     client: Client;
     appointments: Client["appointments"];
-  }>(`/admin/clients/${encodeURIComponent(id)}`, options);
+  }>(`/dashboard/clients/${encodeURIComponent(id)}`, options);
   return {
     ...data.client,
     appointments: (data.appointments ?? []).map(normalizeAppointment),

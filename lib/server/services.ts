@@ -25,24 +25,24 @@ export const SERVICE_INCLUDE = {
   barbers: { select: { id: true, name: true, isActive: true } },
 } as const;
 
-export function listServices({ includeInactive = false } = {}) {
+export function listServices(salonId: string, { includeInactive = false } = {}) {
   return prisma.service.findMany({
-    where: includeInactive ? {} : { isActive: true },
+    where: includeInactive ? { salonId } : { salonId, isActive: true },
     orderBy: [{ category: "asc" }, { name: "asc" }],
     include: SERVICE_INCLUDE,
   });
 }
 
-export function getServiceById(id: string) {
-  return prisma.service.findUnique({ where: { id }, include: SERVICE_INCLUDE });
+export function getServiceById(salonId: string, id: string) {
+  return prisma.service.findFirst({ where: { id, salonId }, include: SERVICE_INCLUDE });
 }
 
 /**
  * Active services as the plain domain type — the direct-Prisma equivalent of
  * `getServices()` from `lib/api`, for Server Components.
  */
-export async function listActiveServicesView(): Promise<Service[]> {
-  const services = await listServices();
+export async function listActiveServicesView(salonId: string): Promise<Service[]> {
+  const services = await listServices(salonId);
   return services.map((service) => ({
     id: service.id,
     name: service.name,

@@ -12,6 +12,11 @@ const eslintConfig = [
   {
     ignores: [".next/**", "node_modules/**", "out/**"],
   },
+  {
+    // Plain-Node CLI scripts (seeding); CommonJS `require` is correct here.
+    files: ["prisma/**/*.js"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ];
 
 export default eslintConfig;

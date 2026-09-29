@@ -1,5 +1,5 @@
-// Prisma schema for the single-salon booking system.
-// See migration plan: single-salon-booking-system-shiny-panda.md
+// Prisma schema for the multi-salon booking platform.
+// Every tenant-owned table carries a `salonId`; see lib/server/salon.ts.
 
 generator client {
   provider = "prisma-client-js"
@@ -21,37 +21,171 @@ enum AppointmentStatus {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   OWNER
   STAFF
 }
 
-/// Singleton row holding the one salon's profile + booking policy.
+/// Look of a salon's public shop page. One page, four skins (see lib/themes.ts).
+enum SalonTheme {
+  SPA
+  CUT
+  PLAYFUL
+  LUXE
+}
+
+enum BillingPlanType {
+  MONTHLY
+  COMMISSION
+}
+
+enum CommissionType {
+  PERCENT
+  FLAT
+}
+
+enum StatementStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  DISMISSED
+}
+
+enum ReviewStatus {
+  PUBLISHED
+  HIDDEN
+}
+
+enum PolicyType {
+  TERMS
+  PRIVACY
+  CANCELLATION
+  CONSENT
+}
+
+/// A tenant: one salon with its own shop page, staff, catalogue and bookings.
+model Salon {
+  id          String     @id @default(uuid())
+  slug        String     @unique
+  name        String
+  tagline     String?
+  about       String?
+  logoUrl     String?
+  coverUrl    String?
+  gallery     String[]
+  theme       SalonTheme @default(SPA)
+  accentColor String?
+  phone       String?
+  email       String?
+  address     String?
+  mapUrl      String?
+  socials     Json?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  settings     SalonSettings?
+  openingHours SalonOpeningHour[]
+  barbers      Barber[]
+  services     Service[]
+  clients      Client[]
+  appointments Appointment[]
+  users        User[]
+  policies     SalonPolicy[]
+  billingPlans SalonBillingPlan[]
+  statements   BillingStatement[]
+  Review       Review[]
+}
+
+/// What the platform charges a salon. Plans are versioned: a change inserts a
+/// new row (latest `effectiveFrom` wins) so past statements stay reproducible.
+model SalonBillingPlan {
+  id              String          @id @default(uuid())
+  salonId         String
+  salon           Salon           @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  planType        BillingPlanType
+  /// MONTHLY: fixed fee per month.
+  monthlyFee      Decimal?        @db.Decimal(10, 2)
+  /// COMMISSION: PERCENT of completed-appointment value, or FLAT per completed booking.
+  commissionType  CommissionType?
+  /// PERCENT: 0-100 (e.g. 12.50). FLAT: currency amount per completed booking.
+  commissionValue Decimal?        @db.Decimal(10, 2)
+  currency        String          @default("INR")
+  effectiveFrom   DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+
+  @@index([salonId, effectiveFrom])
+}
+
+model BillingStatement {
+  id                String          @id @default(uuid())
+  salonId           String
+  salon             Salon           @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  periodStart       DateTime        @db.Date
+  periodEnd         DateTime        @db.Date
+  planSnapshot      Json
+  completedBookings Int
+  grossRevenue      Decimal         @db.Decimal(12, 2)
+  amountDue         Decimal         @db.Decimal(12, 2)
+  status            StatementStatus @default(DRAFT)
+  paidAt            DateTime?
+  note              String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([salonId, periodStart])
+}
+
+/// Owner-editable policy text shown on the salon's shop page.
+model SalonPolicy {
+  id        String     @id @default(uuid())
+  salonId   String
+  salon     Salon      @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  type      PolicyType
+  body      String
+  version   Int        @default(1)
+  updatedAt DateTime   @updatedAt
+
+  @@unique([salonId, type])
+}
+
+/// Per-salon booking policy (profile fields live on `Salon`).
 model SalonSettings {
-  id                          Int      @id @default(1)
-  name                        String
-  logo                        String?
-  phone                       String?
-  email                       String?
-  address                     String?
-  slotIntervalMinutes         Int      @default(15)
-  minimumAdvanceBookingMinutes Int     @default(30)
-  maximumAdvanceBookingDays   Int      @default(30)
-  cancellationWindowMinutes   Int      @default(60)
-  createdAt                   DateTime @default(now())
-  updatedAt                   DateTime @updatedAt
+  id                           Int      @id @default(autoincrement())
+  salonId                      String   @unique
+  salon                        Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  slotIntervalMinutes          Int      @default(15)
+  minimumAdvanceBookingMinutes Int      @default(30)
+  maximumAdvanceBookingDays    Int      @default(30)
+  cancellationWindowMinutes    Int      @default(60)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
 }
 
 /// One row per weekday (0=Sunday..6=Saturday) for the salon's own hours.
 model SalonOpeningHour {
   id        Int     @id @default(autoincrement())
-  weekday   Int     @unique
+  salonId   String
+  salon     Salon   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  weekday   Int
   isOpen    Boolean @default(true)
   openTime  Int
   closeTime Int
+
+  @@unique([salonId, weekday])
 }
 
 model Barber {
   id              String   @id @default(uuid())
+  salonId         String
+  salon           Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
   name            String
   phone           String?
   email           String?
@@ -62,11 +196,11 @@ model Barber {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  services      Service[]          @relation("BarberServices")
-  workingHours  BarberWorkingHour[]
-  breaks        BarberBreak[]
-  daysOff       BarberDayOff[]
-  appointments  Appointment[]
+  services     Service[]           @relation("BarberServices")
+  workingHours BarberWorkingHour[]
+  breaks       BarberBreak[]
+  daysOff      BarberDayOff[]
+  appointments Appointment[]
 }
 
 /// One row per barber per weekday.
@@ -106,6 +240,8 @@ model BarberDayOff {
 
 model Service {
   id              String   @id @default(uuid())
+  salonId         String
+  salon           Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
   name            String
   description     String?
   price           Decimal  @db.Decimal(10, 2)
@@ -121,8 +257,10 @@ model Service {
 
 model Client {
   id          String    @id @default(uuid())
+  salonId     String
+  salon       Salon     @relation(fields: [salonId], references: [id], onDelete: Cascade)
   name        String
-  phone       String    @unique
+  phone       String
   email       String?
   notes       String?
   totalVisits Int       @default(0)
@@ -131,10 +269,14 @@ model Client {
   updatedAt   DateTime  @updatedAt
 
   appointments Appointment[]
+
+  @@unique([salonId, phone])
 }
 
 model Appointment {
   id              String            @id @default(uuid())
+  salonId         String
+  salon           Salon             @relation(fields: [salonId], references: [id], onDelete: Cascade)
   clientId        String
   client          Client            @relation(fields: [clientId], references: [id])
   barberId        String
@@ -148,6 +290,13 @@ model Appointment {
   price           Decimal           @db.Decimal(10, 2)
   status          AppointmentStatus @default(CONFIRMED)
   notes           String?
+  /// Data-processing consent captured at booking (DPDP / GDPR-style record).
+  consentAt       DateTime?
+  consentVersion  String?
+  marketingOptIn  Boolean           @default(false)
+  /// Random one-time token letting the (unauthenticated) customer review after COMPLETED.
+  reviewToken     String?           @unique
+  review          Review?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -160,9 +309,10 @@ model Appointment {
 
   @@index([barberId, appointmentDate])
   @@index([clientId])
+  @@index([salonId, appointmentDate])
 }
 
-/// Admin/staff login accounts only - customers never authenticate.
+/// Platform/salon login accounts only - customers never authenticate.
 model User {
   id          String   @id @default(uuid())
   firstName   String
@@ -170,10 +320,48 @@ model User {
   email       String   @unique
   password    String
   phoneNumber String?
+  /// Null for SUPER_ADMIN (platform-level); required for OWNER/STAFF.
+  salonId     String?
+  salon       Salon?   @relation(fields: [salonId], references: [id], onDelete: Cascade)
   role        UserRole @default(STAFF)
   enabled     Boolean  @default(true)
   passToken   String?
   devices     Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+/// One customer review per completed appointment, shown on the salon page.
+model Review {
+  id            String       @id @default(uuid())
+  salonId       String
+  salon         Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  appointmentId String       @unique
+  appointment   Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  rating        Int
+  comment       String?
+  authorName    String
+  status        ReviewStatus @default(PUBLISHED)
+  ownerReply    String?
+  repliedAt     DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([salonId, status, createdAt])
+}
+
+/// A "list your salon" enquiry from the marketing site. Platform-level (no salonId).
+model PlatformLead {
+  id             String     @id @default(uuid())
+  name           String
+  salonName      String
+  email          String
+  phone          String?
+  city           String?
+  message        String?
+  status         LeadStatus @default(NEW)
+  consentAt      DateTime
+  consentVersion String
+  createdAt      DateTime   @default(now())
+
+  @@index([status, createdAt])
 }

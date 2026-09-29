@@ -76,10 +76,10 @@ export function scalarFields(body: Body): Record<string, unknown> {
 /**
  * Active barbers for Server Components (e.g. landing page showcase).
  */
-export async function listActiveBarbersView() {
+export async function listActiveBarbersView(salonId: string) {
   const prismaModule = await import("./prisma");
   const barbers = await prismaModule.default.barber.findMany({
-    where: { isActive: true },
+    where: { salonId, isActive: true },
     orderBy: { name: "asc" },
     include: {
       services: { select: { id: true, name: true, durationMinutes: true, price: true, isActive: true } },

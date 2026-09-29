@@ -18,50 +18,51 @@ import type { RequestOptions } from "./client";
 /* ----------------------------- Public (customer) ---------------------------- */
 
 /**
- * `GET /api/barbers?serviceId=` — barbers who can perform the given service
- * (active only). Omit `serviceId` for the full active roster.
+ * `GET /api/s/:slug/barbers?serviceId=` — a salon's barbers who can perform the
+ * given service (active only). Omit `serviceId` for the full active roster.
  */
 export async function getBarbers(
+  salonSlug: string,
   serviceId?: string,
   options?: RequestOptions,
 ): Promise<Barber[]> {
-  const data = await get<{ success: true; barbers: Barber[] }>("/barbers", {
-    ...options,
-    query: { serviceId, ...options?.query },
-  });
+  const data = await get<{ success: true; barbers: Barber[] }>(
+    `/s/${encodeURIComponent(salonSlug)}/barbers`,
+    { auth: false, ...options, query: { serviceId, ...options?.query } },
+  );
   return data.barbers.map(normalizeBarber);
 }
 
-/** `GET /api/barbers/:id` */
+/** `GET /api/s/:slug/barbers/:id` */
 export async function getBarber(
+  salonSlug: string,
   id: string,
   options?: RequestOptions,
 ): Promise<Barber> {
   const data = await get<{ success: true; barber: Barber }>(
-    `/barbers/${encodeURIComponent(id)}`,
-    options,
+    `/s/${encodeURIComponent(salonSlug)}/barbers/${encodeURIComponent(id)}`,
+    { auth: false, ...options },
   );
   return normalizeBarber(data.barber);
 }
 
 /**
- * `GET /api/barbers/:id/availability?serviceId=&date=&excludeAppointmentId=`
- * — a single barber's slots.
+ * `GET /api/dashboard/barbers/:id/availability?serviceId=&date=&excludeAppointmentId=`
+ * — a single barber's slots for the signed-in staff's salon (reschedule dialog).
  *
  * `excludeAppointmentId` leaves one existing appointment out of the overlap
  * check, so a RESCHEDULE sees the grid as it will be once that appointment has
  * moved — its own time free, and every other time it currently overlaps free
  * too. Without it the appointment blocks itself and the admin is under-offered
- * slots. The write path (`PATCH /api/admin/appointments/:id`) always excludes
+ * slots. The write path (`PATCH /api/dashboard/appointments/:id`) always excludes
  * the row being moved, so this makes the read agree with the write.
  */
-export async function getBarberAvailability(
+export async function getAdminBarberAvailability(
   id: string,
   params: { serviceId: string; date: string; excludeAppointmentId?: string },
   options?: RequestOptions,
 ): Promise<AvailabilityResponse> {
-  return get<AvailabilityResponse>(`/barbers/${encodeURIComponent(id)}/availability`, {
-    auth: false,
+  return get<AvailabilityResponse>(`/dashboard/barbers/${encodeURIComponent(id)}/availability`, {
     ...options,
     query: {
       serviceId: params.serviceId,
@@ -75,42 +76,50 @@ export async function getBarberAvailability(
 /* --------------------------------- Admin ---------------------------------- */
 
 /**
- * All barbers including inactive ones. There is no separate `/admin/barbers`
- * list route — the admin view is the same public endpoint with
- * `includeInactive=true`, gated server-side by the attached auth token.
+ * `GET /api/dashboard/barbers` — every barber of the signed-in staff's salon,
+ * inactive included.
  */
 export async function getAdminBarbers(options?: RequestOptions): Promise<Barber[]> {
-  const data = await get<{ success: true; barbers: Barber[] }>("/barbers", {
-    ...options,
-    query: { includeInactive: true, ...options?.query },
-  });
+  const data = await get<{ success: true; barbers: Barber[] }>(
+    "/dashboard/barbers",
+    options,
+  );
   return data.barbers.map(normalizeBarber);
 }
 
-/** Alias of `getBarber` — same route, named for admin-context call sites. */
-export const getAdminBarber = getBarber;
+/** `GET /api/dashboard/barbers/:id` — full detail incl. schedule. */
+export async function getAdminBarber(
+  id: string,
+  options?: RequestOptions,
+): Promise<Barber> {
+  const data = await get<{ success: true; barber: Barber }>(
+    `/dashboard/barbers/${encodeURIComponent(id)}`,
+    options,
+  );
+  return normalizeBarber(data.barber);
+}
 
-/** `POST /api/admin/barbers` */
+/** `POST /api/dashboard/barbers` */
 export async function createBarber(
   payload: CreateBarberPayload,
   options?: RequestOptions,
 ): Promise<Barber> {
   const data = await post<{ success: true; barber: Barber }>(
-    "/admin/barbers",
+    "/dashboard/barbers",
     payload,
     options,
   );
   return normalizeBarber(data.barber);
 }
 
-/** `PATCH /api/admin/barbers/:id` */
+/** `PATCH /api/dashboard/barbers/:id` */
 export async function updateBarber(
   id: string,
   payload: UpdateBarberPayload,
   options?: RequestOptions,
 ): Promise<Barber> {
   const data = await patch<{ success: true; barber: Barber }>(
-    `/admin/barbers/${encodeURIComponent(id)}`,
+    `/dashboard/barbers/${encodeURIComponent(id)}`,
     payload,
     options,
   );
@@ -118,7 +127,7 @@ export async function updateBarber(
 }
 
 /**
- * `DELETE /api/admin/barbers/:id`
+ * `DELETE /api/dashboard/barbers/:id`
  *
  * Soft-deletes (deactivates) by default. Pass `hard: true` to permanently
  * delete a barber with no appointment history (the backend rejects a hard
@@ -130,7 +139,7 @@ export async function deleteBarber(
 ): Promise<{ message: string; barber?: Barber }> {
   const { hard, ...options } = opts;
   return del<{ message: string; barber?: Barber }>(
-    `/admin/barbers/${encodeURIComponent(id)}`,
+    `/dashboard/barbers/${encodeURIComponent(id)}`,
     { ...options, query: { hard, ...options.query } },
   );
 }

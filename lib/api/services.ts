@@ -18,27 +18,27 @@ import type { RequestOptions } from "./client";
 
 /* ----------------------------- Public (customer) ---------------------------- */
 
-/**
- * `GET /api/services` — active services by default. The route is public but
- * "admin-optional": if a valid admin token happens to be attached, passing
- * `query: { includeInactive: true }` (see `getAdminServices`) also works here.
- */
-export async function getServices(options?: RequestOptions): Promise<Service[]> {
+/** `GET /api/s/:slug/services` — a salon's active services. */
+export async function getServices(
+  salonSlug: string,
+  options?: RequestOptions,
+): Promise<Service[]> {
   const data = await get<{ success: true; services: Service[] }>(
-    "/services",
-    options,
+    `/s/${encodeURIComponent(salonSlug)}/services`,
+    { auth: false, ...options },
   );
   return data.services.map(normalizeService);
 }
 
-/** `GET /api/services/:id` */
+/** `GET /api/s/:slug/services/:id` */
 export async function getService(
+  salonSlug: string,
   id: string,
   options?: RequestOptions,
 ): Promise<Service> {
   const data = await get<{ success: true; service: Service }>(
-    `/services/${encodeURIComponent(id)}`,
-    options,
+    `/s/${encodeURIComponent(salonSlug)}/services/${encodeURIComponent(id)}`,
+    { auth: false, ...options },
   );
   return normalizeService(data.service);
 }
@@ -46,43 +46,38 @@ export async function getService(
 /* --------------------------------- Admin ---------------------------------- */
 
 /**
- * All services including inactive ones. There is no separate `/admin/services`
- * list route — the admin view is the same public endpoint with
- * `includeInactive=true`, gated server-side by the attached auth token
- * (`admin.optional` middleware).
+ * `GET /api/dashboard/services` — every service of the signed-in staff's salon,
+ * inactive included. The salon comes from the token, not the URL.
  */
 export async function getAdminServices(options?: RequestOptions): Promise<Service[]> {
-  const data = await get<{ success: true; services: Service[] }>("/services", {
-    ...options,
-    query: { includeInactive: true, ...options?.query },
-  });
+  const data = await get<{ success: true; services: Service[] }>(
+    "/dashboard/services",
+    options,
+  );
   return data.services.map(normalizeService);
 }
 
-/** Alias of `getService` — same route, named for admin-context call sites. */
-export const getAdminService = getService;
-
-/** `POST /api/admin/services` */
+/** `POST /api/dashboard/services` */
 export async function createService(
   payload: CreateServicePayload,
   options?: RequestOptions,
 ): Promise<Service> {
   const data = await post<{ success: true; service: Service }>(
-    "/admin/services",
+    "/dashboard/services",
     payload,
     options,
   );
   return normalizeService(data.service);
 }
 
-/** `PATCH /api/admin/services/:id` */
+/** `PATCH /api/dashboard/services/:id` */
 export async function updateService(
   id: string,
   payload: UpdateServicePayload,
   options?: RequestOptions,
 ): Promise<Service> {
   const data = await patch<{ success: true; service: Service }>(
-    `/admin/services/${encodeURIComponent(id)}`,
+    `/dashboard/services/${encodeURIComponent(id)}`,
     payload,
     options,
   );
@@ -90,7 +85,7 @@ export async function updateService(
 }
 
 /**
- * `DELETE /api/admin/services/:id`
+ * `DELETE /api/dashboard/services/:id`
  *
  * Soft-deletes (deactivates) by default. Pass `hard: true` to permanently
  * delete a service with no appointment history (the backend rejects a hard
@@ -102,7 +97,7 @@ export async function deleteService(
 ): Promise<{ message: string; service?: Service }> {
   const { hard, ...options } = opts;
   return del<{ message: string; service?: Service }>(
-    `/admin/services/${encodeURIComponent(id)}`,
+    `/dashboard/services/${encodeURIComponent(id)}`,
     { ...options, query: { hard, ...options.query } },
   );
 }

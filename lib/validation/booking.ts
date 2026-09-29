@@ -45,6 +45,8 @@ export const customerDetailsSchema = z.object({
   phone: phoneSchema,
   email: optionalEmailSchema,
   notes: z.string().trim().max(500, "Notes are too long.").optional(),
+  consent: z.literal(true, { error: "Please agree to the privacy terms to book." }),
+  marketingOptIn: z.boolean().optional(),
 });
 
 export type CustomerDetailsInput = z.infer<typeof customerDetailsSchema>;
@@ -60,7 +62,7 @@ export const timeStringSchema = z
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Select a valid time.");
 
 /**
- * Full `POST /api/appointments` body. Validate immediately before submitting so
+ * Full `POST /api/s/[slug]/appointments` body. Validate immediately before submitting so
  * a half-built wizard state can never reach the API.
  */
 export const createAppointmentSchema = z.object({
@@ -72,6 +74,8 @@ export const createAppointmentSchema = z.object({
   customerPhone: phoneSchema,
   customerEmail: optionalEmailSchema,
   notes: z.string().trim().max(500).optional(),
+  consent: z.literal(true, { error: "Please agree to the privacy terms to book." }),
+  marketingOptIn: z.boolean().optional(),
 });
 
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;

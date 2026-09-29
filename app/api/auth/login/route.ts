@@ -49,9 +49,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const token = generateToken({ id: user.id, role: user.role });
+    const salon = user.salonId
+      ? await prisma.salon.findUnique({
+          where: { id: user.salonId },
+          select: { slug: true, name: true, isActive: true },
+        })
+      : null;
+    if (user.role !== "SUPER_ADMIN" && (!salon || !salon.isActive)) {
+      return NextResponse.json(
+        { success: false, message: "This salon is not active." },
+        { status: 403 },
+      );
+    }
+
+    // `salonId` in the token is informational only: every request re-reads the
+    // user row, which is the source of truth for tenancy (see `auth.ts`).
+    const token = generateToken({ id: user.id, role: user.role, salonId: user.salonId });
     return NextResponse.json(
-      { success: true, token, user: publicUser(user) },
+      { success: true, token, user: publicUser(user, salon) },
       { status: 200 },
     );
   } catch (error) {

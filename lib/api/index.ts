@@ -31,7 +31,7 @@ export {
   getAdminBarber,
   getAdminBarbers,
   getBarber,
-  getBarberAvailability,
+  getAdminBarberAvailability,
   getBarbers,
   updateBarber,
 } from "./barbers";
@@ -39,13 +39,12 @@ export { getClient, getClients } from "./clients";
 export {
   createService,
   deleteService,
-  getAdminService,
   getAdminServices,
   getService,
   getServices,
   updateService,
 } from "./services";
-export { getSettings, updateSettings } from "./settings";
+export { getAdminSettings, getSettings, updateSettings } from "./settings";
 export {
   normalizeAppointment,
   normalizeBarber,

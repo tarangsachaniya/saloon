@@ -2,6 +2,7 @@
 
 import { getAvailability } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
+import { useSalon } from "@/lib/salon/SalonContext";
 import type { AvailabilityResponse, Slot } from "@/lib/booking/types";
 import { Button, EmptyState, Loader } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
@@ -75,6 +76,7 @@ function SlotButton({
 export function SlotGrid({ onSelected, onChangeDate }: SlotGridProps) {
   const { service, barber, isAnyBarber, barberSelection, date, slot: selected, selectSlot } =
     useBooking();
+  const { slug } = useSalon();
 
   const serviceId = service?.id ?? null;
 
@@ -82,11 +84,12 @@ export function SlotGrid({ onSelected, onChangeDate }: SlotGridProps) {
     (signal) =>
       serviceId && barberSelection && date
         ? getAvailability(
+            slug,
             { serviceId, barberId: barberSelection, date },
             { signal },
           )
         : Promise.resolve(null),
-    [serviceId, barberSelection, date],
+    [slug, serviceId, barberSelection, date],
   );
 
   function choose(slot: Slot) {

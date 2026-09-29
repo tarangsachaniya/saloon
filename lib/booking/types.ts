@@ -200,6 +200,10 @@ export interface CreateAppointmentPayload {
   customerPhone: string;
   customerEmail?: string;
   notes?: string;
+  /** Data-processing consent. Mandatory: the API rejects a booking without it. */
+  consent: true;
+  /** Separate, optional marketing opt-in. */
+  marketingOptIn?: boolean;
 }
 
 /**
@@ -296,6 +300,11 @@ export interface SalonSettings {
   phone: string | null;
   email: string | null;
   address: string | null;
+  /**
+   * OpenStreetMap embed URL generated from the salon's latitude/longitude.
+   * Stored in `Salon.mapUrl`. Null when the owner has not set coordinates yet.
+   */
+  mapUrl: string | null;
   /** Granularity of generated availability slots. */
   slotIntervalMinutes: number;
   /** How far ahead of "now" a booking must be made. */
@@ -313,7 +322,7 @@ export type UpdateSalonSettingsPayload = Partial<SalonSettings>;
 /* Auth (admin/staff only — customers never authenticate)                      */
 /* -------------------------------------------------------------------------- */
 
-export type UserRole = "OWNER" | "STAFF";
+export type UserRole = "SUPER_ADMIN" | "OWNER" | "STAFF";
 
 export interface User {
   id: string;
@@ -321,6 +330,10 @@ export interface User {
   lastName: string;
   email: string;
   role: UserRole;
+  /** Null for SUPER_ADMIN. */
+  salonId: string | null;
+  salonSlug: string | null;
+  salonName: string | null;
 }
 
 /** `POST /api/auth/login` success body. */

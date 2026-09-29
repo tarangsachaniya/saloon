@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Lenis smooth-scroll (marketing site): recommended base rules. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -29,6 +41,25 @@
   h6 {
     @apply font-bold text-primary;
     text-wrap: balance;
+  }
+
+  /* The marketing site sets its own type: headings inherit their section's
+     colour instead of the dashboard's navy. */
+  /* Salon pages: headings use the theme's display type. */
+  :where(.salon-theme) :is(h1, h2, h3) {
+    font-family: var(--t-font-display);
+    text-transform: var(--t-case);
+    letter-spacing: var(--t-tracking);
+    font-weight: var(--t-weight);
+  }
+
+  /* On the shop page itself, headings take their section's colour. */
+  :where(.salon-shop) :is(h1, h2, h3, h4) {
+    color: inherit;
+  }
+
+  :where(.site-marketing) :is(h1, h2, h3, h4, h5, h6) {
+    color: inherit;
   }
 }
 

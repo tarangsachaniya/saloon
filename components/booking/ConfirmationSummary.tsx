@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { createAppointment, isApiError } from "@/lib/api";
 import { useBooking, type BookingStep } from "@/lib/booking/BookingContext";
+import { useSalon } from "@/lib/salon/SalonContext";
 import type { CreateAppointmentPayload } from "@/lib/booking/types";
 import { Button, Card } from "@/components/ui";
 import { formatPrice } from "@/lib/utils/format";
@@ -66,6 +67,7 @@ export interface ConfirmationSummaryProps {
 
 export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
   const router = useRouter();
+  const { slug } = useSalon();
   const {
     service,
     barber,
@@ -95,6 +97,10 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
 
   async function handleConfirm() {
     if (!service || !barberSelection || !date || !slot) return;
+    if (!customer.consent) {
+      setFailure("Please agree to the privacy terms to book.");
+      return;
+    }
 
     const payload: CreateAppointmentPayload = {
       serviceId: service.id,
@@ -103,6 +109,8 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
       startTime: slot.start,
       customerName: customer.name.trim(),
       customerPhone: customer.phone.trim(),
+      consent: true,
+      marketingOptIn: customer.marketingOptIn,
     };
     const email = customer.email.trim();
     if (email) payload.customerEmail = email;
@@ -124,11 +132,11 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
     setFailure(null);
 
     try {
-      const result = await createAppointment(payload);
+      const result = await createAppointment(slug, payload);
 
       if (result.success) {
         setConfirmedAppointment(result.appointment);
-        router.push("/book/confirmation");
+        router.push(`/s/${slug}/book/confirmation`);
         return;
       }
 

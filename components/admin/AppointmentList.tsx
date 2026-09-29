@@ -21,7 +21,7 @@ import { formatAdminDate } from "@/lib/admin/format";
 import { getBarberPhotoUrl } from "@/lib/utils/barberImages";
 
 /**
- * Appointment rendering, shared by the diary (`/admin/appointments`) and the
+ * Appointment rendering, shared by the diary (`/dashboard/appointments`) and the
  * dashboard.
  *
  * WHY A TABLE AND A CARD LIST RATHER THAN ONE RESPONSIVE THING: a diary row is

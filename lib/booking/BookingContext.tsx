@@ -49,6 +49,10 @@ export interface CustomerDetails {
   phone: string;
   email: string;
   notes: string;
+  /** Required data-processing consent. Never pre-ticked. */
+  consent: boolean;
+  /** Separate, optional marketing opt-in. Never pre-ticked. */
+  marketingOptIn: boolean;
 }
 
 const EMPTY_CUSTOMER: CustomerDetails = {
@@ -56,6 +60,8 @@ const EMPTY_CUSTOMER: CustomerDetails = {
   phone: "",
   email: "",
   notes: "",
+  consent: false,
+  marketingOptIn: false,
 };
 
 export interface BookingState {
@@ -181,7 +187,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     if (state.barber || state.isAnyBarber) done.add("barber");
     if (state.date) done.add("date");
     if (state.slot) done.add("slot");
-    if (state.customer.name.trim() && state.customer.phone.trim()) {
+    if (
+      state.customer.name.trim() &&
+      state.customer.phone.trim() &&
+      state.customer.consent
+    ) {
       done.add("details");
     }
     if (state.confirmedAppointment) done.add("confirm");

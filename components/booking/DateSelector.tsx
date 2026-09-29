@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { getSettings } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
+import { useSalon } from "@/lib/salon/SalonContext";
 import type { DateString } from "@/lib/booking/types";
 import { Calendar, Card, Loader, maxBookableDate } from "@/components/ui";
 import {
@@ -35,9 +36,10 @@ const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
 export function DateSelector({ onSelected }: { onSelected: () => void }) {
   const { date: selected, selectDate } = useBooking();
+  const { slug } = useSalon();
   const { data: settings, error, isLoading, reload } = useAsync(
-    (signal) => getSettings({ signal }),
-    [],
+    (signal) => getSettings(slug, { signal }),
+    [slug],
   );
 
   const closedWeekdays = useMemo(() => {

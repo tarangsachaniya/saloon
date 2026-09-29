@@ -16,6 +16,9 @@ export const createAppointmentBodySchema = z.object({
   customerPhone: z.string().trim().min(5).max(20),
   customerEmail: z.email().max(180).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
+  // Data-processing consent is mandatory to book; marketing is a separate opt-in.
+  consent: z.literal(true),
+  marketingOptIn: z.boolean().optional(),
 });
 
 // Admin PATCH: status transition and/or reschedule. At least one field.

@@ -1,3 +1,17 @@
+// !! DESTRUCTIVE + OUT OF DATE !!
+// This script wipes EVERY table (all salons, users, bookings) and was written
+// for the old single-salon schema, so it also no longer matches the multi-salon
+// schema. It is disabled unless ALLOW_DESTRUCTIVE_SEED=1 is set explicitly, and
+// will be rewritten to seed demo salons safely. To create the platform
+// operator login use `npm run prisma:seed-superadmin` (idempotent, wipes nothing).
+if (process.env.ALLOW_DESTRUCTIVE_SEED !== "1") {
+  console.error(
+    "Refusing to run: this seed deletes all data and targets the old schema.\n" +
+      "Use `npm run prisma:seed-superadmin` to create the platform admin instead.",
+  );
+  process.exit(1);
+}
+
 // Wipes and repopulates demo data for local development: one salon profile
 // + opening hours, one owner login, a handful of barbers with schedules/
 // breaks/days-off, a set of services, and a few clients/appointments so the

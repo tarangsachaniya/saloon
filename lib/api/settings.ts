@@ -23,19 +23,31 @@ function mergeSettings(data: SettingsEnvelope): SalonSettings {
 }
 
 /**
- * `GET /api/settings` — public salon profile plus the booking rules the wizard
- * needs (slot interval, advance-booking bounds, opening hours).
+ * `GET /api/s/:slug/settings` — a salon's public profile plus the booking rules
+ * the wizard needs (slot interval, advance-booking bounds, opening hours).
  */
-export async function getSettings(options?: RequestOptions): Promise<SalonSettings> {
-  const data = await get<SettingsEnvelope>("/settings", { auth: false, ...options });
+export async function getSettings(
+  salonSlug: string,
+  options?: RequestOptions,
+): Promise<SalonSettings> {
+  const data = await get<SettingsEnvelope>(
+    `/s/${encodeURIComponent(salonSlug)}/settings`,
+    { auth: false, ...options },
+  );
   return mergeSettings(data);
 }
 
-/** `PATCH /api/admin/settings` */
+/** `GET /api/dashboard/settings` — the signed-in staff's own salon. */
+export async function getAdminSettings(options?: RequestOptions): Promise<SalonSettings> {
+  const data = await get<SettingsEnvelope>("/dashboard/settings", options);
+  return mergeSettings(data);
+}
+
+/** `PATCH /api/dashboard/settings` */
 export async function updateSettings(
   payload: UpdateSalonSettingsPayload,
   options?: RequestOptions,
 ): Promise<SalonSettings> {
-  const data = await patch<SettingsEnvelope>("/admin/settings", payload, options);
+  const data = await patch<SettingsEnvelope>("/dashboard/settings", payload, options);
   return mergeSettings(data);
 }
