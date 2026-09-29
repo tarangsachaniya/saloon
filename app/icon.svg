@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>Salonly</title>
+  <!-- Tile -->
+  <rect width="64" height="64" rx="16" fill="#3b1a3f"/>
+  <!-- Calendar page with a tomato header -->
+  <rect x="11" y="17" width="40" height="36" rx="7" fill="#ffe27a"/>
+  <path d="M18 17h26a7 7 0 0 1 7 7v3H11v-3a7 7 0 0 1 7-7z" fill="#ff6b4a"/>
+  <!-- Binder rings -->
+  <rect x="19" y="11" width="5" height="11" rx="2.5" fill="#fffaf0"/>
+  <rect x="38" y="11" width="5" height="11" rx="2.5" fill="#fffaf0"/>
+  <!-- Booked -->
+  <path d="M21 39.5l6.5 6.5L41 32.5" fill="none" stroke="#3b1a3f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Beautifully -->
+  <path d="M52 6q1.2 6 7 7.5q-5.8 1.5-7 7.5q-1.2-6-7-7.5q5.8-1.5 7-7.5z" fill="#c9b8ff" stroke="#3b1a3f" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>

@@ -17,6 +17,8 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
+  // Makes og:image and other metadata URLs absolute. Unset, Next falls back to localhost/VERCEL_URL.
+  metadataBase: process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL) : undefined,
   title: {
     default: "Book your appointment",
     template: "%s | Salon Booking",

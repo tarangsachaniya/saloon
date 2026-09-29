@@ -31,11 +31,13 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return {
     title: { default: salon.name, template: `%s | ${salon.name}` },
     description: salon.tagline ?? `Book an appointment at ${salon.name}.`,
+    // The share image comes from `opengraph-image.tsx` (logo + address).
     openGraph: {
       title: salon.name,
       description: salon.tagline ?? undefined,
-      images: salon.coverUrl ? [salon.coverUrl] : undefined,
+      type: "website",
     },
+    twitter: { card: "summary_large_image", title: salon.name, description: salon.tagline ?? undefined },
   };
 }
 
