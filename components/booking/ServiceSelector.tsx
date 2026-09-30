@@ -54,7 +54,8 @@ export function ServiceSelector({ onSelected }: { onSelected: () => void }) {
           <button
             type="button"
             onClick={() => setActiveCategory("all")}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+            aria-pressed={activeCategory === "all"}
+            className={`min-h-9 rounded-full px-3.5 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary text-xs font-bold transition-all ${
               activeCategory === "all"
                 ? "bg-primary text-white shadow-sm scale-105"
                 : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -67,7 +68,8 @@ export function ServiceSelector({ onSelected }: { onSelected: () => void }) {
               key={cat}
               type="button"
               onClick={() => setActiveCategory(cat)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+              aria-pressed={activeCategory.toLowerCase() === cat.toLowerCase()}
+              className={`min-h-9 rounded-full px-3.5 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary text-xs font-bold transition-all ${
                 activeCategory.toLowerCase() === cat.toLowerCase()
                   ? "bg-primary text-white shadow-sm scale-105"
                   : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"

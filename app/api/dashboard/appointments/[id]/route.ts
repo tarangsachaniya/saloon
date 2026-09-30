@@ -7,6 +7,7 @@ import * as availability from "@/lib/server/availability";
 import { requireAdmin } from "@/lib/server/auth";
 import { APPOINTMENT_INCLUDE, isValidTransition } from "@/lib/server/appointments";
 import { isExclusionViolation, SLOT_TAKEN_MESSAGE } from "@/lib/server/dbErrors";
+import { ensureCommissionForCompleted } from "@/lib/server/commissions";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
 import { updateAppointmentBodySchema } from "@/lib/server/validation/appointmentValidation";
 
@@ -155,10 +156,21 @@ export async function PATCH(
 
     let appointment;
     try {
-      appointment = await prisma.appointment.update({
-        where: { id: existing.id },
-        data,
-        include: APPOINTMENT_INCLUDE,
+      // Status change and its commission are ONE transaction: an appointment
+      // is never left COMPLETED without its commission row (and vice versa).
+      appointment = await prisma.$transaction(async (tx) => {
+        const updated = await tx.appointment.update({
+          where: { id: existing.id },
+          data,
+          include: APPOINTMENT_INCLUDE,
+        });
+        if (data.status === "COMPLETED") await ensureCommissionForCompleted(tx, updated.id);
+        return updated;
+      }, {
+        // Prisma's 5s default is tight over a remote database (each query is a
+        // round trip); a timed-out transaction would fail a legitimate completion.
+        maxWait: 10_000,
+        timeout: 20_000,
       });
     } catch (error) {
       if (isExclusionViolation(error)) {

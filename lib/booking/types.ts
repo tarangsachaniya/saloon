@@ -93,6 +93,8 @@ export interface Barber {
   bio: string | null;
   specializations: string[];
   isActive: boolean;
+  /** Owner dashboard only (never sent to staff or the public site). Decimal string on the wire. */
+  commissionPercentage?: number | string;
   services?: Array<
     Pick<Service, "id" | "name"> & Partial<Pick<Service, "durationMinutes" | "price" | "isActive">>
   >;
@@ -214,7 +216,7 @@ export interface CreateAppointmentPayload {
  */
 export type CreateAppointmentResult =
   | { success: true; appointment: Appointment }
-  | { success: false; message: string };
+  | { success: false; message: string; /** HTTP status of the rejection, when known. */ status?: number };
 
 /**
  * Body for `PATCH /api/admin/appointments/:id`.
@@ -322,7 +324,7 @@ export type UpdateSalonSettingsPayload = Partial<SalonSettings>;
 /* Auth (admin/staff only — customers never authenticate)                      */
 /* -------------------------------------------------------------------------- */
 
-export type UserRole = "SUPER_ADMIN" | "OWNER" | "STAFF";
+export type UserRole = "SUPER_ADMIN" | "OWNER" | "STAFF" | "CUSTOMER";
 
 export interface User {
   id: string;
@@ -341,6 +343,14 @@ export interface LoginResponse {
   success: true;
   token: string;
   user: User;
+}
+
+/** `POST /api/auth/login` when the account has an authenticator app enabled. */
+export interface TwoFactorRequiredResponse {
+  success: true;
+  twoFactorRequired: true;
+  /** Short-lived proof of the password step, sent back with the code. */
+  challenge: string;
 }
 
 /* -------------------------------------------------------------------------- */

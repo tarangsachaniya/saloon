@@ -25,7 +25,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
     if (!token) router.replace(`/login?redirectTo=${encodeURIComponent(pathname)}`);
-    else if (user && user.role !== "SUPER_ADMIN") router.replace("/dashboard");
+    else if (user && user.role !== "SUPER_ADMIN") router.replace(user.role === "CUSTOMER" ? "/" : "/dashboard");
   }, [isLoading, token, user, pathname, router]);
 
   const ready = !isLoading && token && user?.role === "SUPER_ADMIN";

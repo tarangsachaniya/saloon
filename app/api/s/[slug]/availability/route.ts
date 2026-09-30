@@ -63,6 +63,9 @@ export async function GET(
       barberId,
       date,
       excludeAppointmentId: excludeAppointmentId || null,
+      // The customer wizard never passes an appointment to exclude; staff
+      // rescheduling does, and may move an appointment on an inactive service.
+      bookableOnly: !excludeAppointmentId,
     });
     return NextResponse.json({ success: true, ...result }, { status: 200 });
   } catch (error) {

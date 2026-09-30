@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useBooking } from "@/lib/booking/BookingContext";
 import { useSalon } from "@/lib/salon/SalonContext";
 import { Button, Input, Textarea } from "@/components/ui";
+import { getAccount } from "@/lib/api/account";
+import { useSessionUser } from "@/lib/auth/useSessionUser";
 import { customerDetailsSchema, fieldErrors } from "@/lib/validation/booking";
 import { StepShell } from "./StepShell";
 
@@ -22,6 +24,32 @@ export function CustomerDetailsForm({ onSubmitted }: { onSubmitted: () => void }
   const { customer, setCustomer } = useBooking();
   const { slug } = useSalon();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const session = useSessionUser();
+  const prefilled = useRef(false);
+
+  // A signed-in customer already told us their name, email and phone. Fetch the
+  // account once per wizard visit and fill only fields still empty, so anything
+  // typed (or restored from an earlier pass through this step) is never
+  // overwritten. Guests skip this; staff get a 403 and it stays blank; failures are silent.
+  useEffect(() => {
+    if (prefilled.current || !session.signedIn) return;
+    if (customer.name && customer.phone && customer.email) return;
+    prefilled.current = true;
+    // No cancel-on-cleanup: React StrictMode runs effects twice in dev, and a
+    // cancelled first run plus a `prefilled` guard would mean nothing ever fills.
+    // The context outlives this component, so a late result is harmless.
+    getAccount()
+      .then((account) => {
+        setCustomer({
+          ...(customer.name ? {} : { name: account.name }),
+          ...(customer.phone ? {} : { phone: account.phone ?? "" }),
+          ...(customer.email ? {} : { email: account.email }),
+        });
+      })
+      .catch(() => {});
+    // Once per mount: later edits must not re-trigger a fill.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.signedIn]);
 
   function update(field: keyof typeof customer, value: string) {
     setCustomer({ [field]: value });

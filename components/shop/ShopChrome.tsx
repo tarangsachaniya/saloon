@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { BRAND } from "@/lib/brand";
+import { ShopAccountLink } from "./ShopAccountLink";
 import { shopButton, shopHeading } from "./ui";
 
 type Salon = { slug: string; name: string; logoUrl: string | null; phone: string | null };
@@ -41,6 +42,13 @@ export function ShopNav({ salon }: { salon: Salon }) {
               Call
             </a>
           )}
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center rounded-th px-4 text-sm font-semibold text-th-text hover:underline"
+          >
+            Home
+          </Link>
+          <ShopAccountLink />
           <Link href={`/s/${salon.slug}/book`} className={`${shopButton} min-h-11 px-5 text-sm`}>
             Book now
           </Link>

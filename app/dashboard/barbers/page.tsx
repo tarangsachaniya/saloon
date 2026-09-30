@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { BarberFormDialog } from "@/components/admin/BarberFormDialog";
+import { CommissionDialog } from "@/components/admin/CommissionDialog";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { PlusIcon, RefreshIcon } from "@/components/admin/icons";
 import { LoadError, PageHeader } from "@/components/admin/PageHeader";
@@ -42,7 +43,7 @@ import { getBarberPhotoUrl } from "@/lib/utils/barberImages";
 export default function BarbersPage() {
   const { toasts, push, dismiss } = useToasts();
 
-  const { data, error, isLoading, isRefreshing, refresh } = useAdminData(
+  const { data, error, isLoading, isRefreshing, refresh, setData } = useAdminData(
     async (signal) => {
       const [barbers, services] = await Promise.all([
         getAdminBarbers({ signal }),
@@ -60,6 +61,7 @@ export default function BarbersPage() {
   const [confirmTarget, setConfirmTarget] = useState<Barber | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [commissionFor, setCommissionFor] = useState<Barber | null>(null);
 
   const barbers = useMemo(() => data?.barbers ?? [], [data]);
   const services: Service[] = useMemo(() => data?.services ?? [], [data]);
@@ -199,7 +201,15 @@ export default function BarbersPage() {
                   </p>
                 </div>
 
-                <div className="mt-4 flex gap-2">
+                {/* Present only for the salon owner: the API omits it for staff. */}
+                {barber.commissionPercentage !== undefined && (
+                  <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Commission</p>
+                    <p className="text-sm font-bold text-primary">{Number(barber.commissionPercentage)}%</p>
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -207,6 +217,11 @@ export default function BarbersPage() {
                   >
                     Edit schedule
                   </Button>
+                  {barber.commissionPercentage !== undefined && (
+                    <Button size="sm" variant="outline" onClick={() => setCommissionFor(barber)}>
+                      Edit commission
+                    </Button>
+                  )}
                   {barber.isActive ? (
                     <Button
                       size="sm"
@@ -245,6 +260,25 @@ export default function BarbersPage() {
           Couldn&rsquo;t refresh: {error}
         </p>
       )}
+
+      <CommissionDialog
+        worker={
+          commissionFor
+            ? { id: commissionFor.id, name: commissionFor.name, commissionPercentage: Number(commissionFor.commissionPercentage) }
+            : null
+        }
+        onClose={() => setCommissionFor(null)}
+        onSaved={(workerId, percentage) => {
+          const name = commissionFor?.name ?? "Worker";
+          setCommissionFor(null);
+          setData((current) =>
+            current
+              ? { ...current, barbers: current.barbers.map((b) => (b.id === workerId ? { ...b, commissionPercentage: percentage } : b)) }
+              : current,
+          );
+          push("success", `${name} — commission updated successfully.`);
+        }}
+      />
 
       <BarberFormDialog
         barberId={editingId}

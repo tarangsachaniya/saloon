@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/server/prisma";
 import { comSync } from "@/lib/server/password";
-import { generateToken } from "@/lib/server/jwt";
+import { generateToken, generateTwoFactorChallenge } from "@/lib/server/jwt";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
 import { loginBodySchema } from "@/lib/server/validation/userValidation";
 import { publicUser } from "@/lib/server/publicUser";
 
 /**
- * POST /api/auth/login — admin/staff authentication.
+ * POST /api/auth/login — staff, platform operator and customer authentication.
  *
  * Port of `loginController.login`.
  *
@@ -55,10 +55,19 @@ export async function POST(request: Request) {
           select: { slug: true, name: true, isActive: true },
         })
       : null;
-    if (user.role !== "SUPER_ADMIN" && (!salon || !salon.isActive)) {
+    // Customers have no salon; only salon staff need an active one.
+    if (user.role !== "SUPER_ADMIN" && user.role !== "CUSTOMER" && (!salon || !salon.isActive)) {
       return NextResponse.json(
         { success: false, message: "This salon is not active." },
         { status: 403 },
+      );
+    }
+
+    // Password is right but an authenticator code is still owed: no session yet.
+    if (user.twoFactorEnabled) {
+      return NextResponse.json(
+        { success: true, twoFactorRequired: true, challenge: generateTwoFactorChallenge(user.id) },
+        { status: 200 },
       );
     }
 

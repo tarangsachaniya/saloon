@@ -29,7 +29,8 @@ export async function createAppointment(
 ): Promise<CreateAppointmentResult> {
   try {
     const result = await post<CreateAppointmentResult>(`/s/${encodeURIComponent(salonSlug)}/appointments`, payload, {
-      auth: false,
+      // Sends the customer's token when there is one so the booking lands in
+      // their account; the endpoint ignores a missing or stale token.
       ...options,
     });
     return result.success
@@ -42,12 +43,13 @@ export async function createAppointment(
         return {
           success: false,
           message: body.message ?? error.message,
+          status: error.status,
         };
       }
       // Any other 4xx with a usable message is still a business failure to the
       // customer; 5xx and unparseable bodies keep throwing.
       if (error.status >= 400 && error.status < 500) {
-        return { success: false, message: error.message };
+        return { success: false, message: error.message, status: error.status };
       }
     }
     throw error;

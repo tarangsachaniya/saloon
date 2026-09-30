@@ -39,6 +39,8 @@ interface NavItem {
   /** Shorter label for the cramped mobile tab bar. */
   shortLabel: string;
   Icon: typeof DashboardIcon;
+  /** Hidden from salon staff (the API is owner-only too). */
+  ownerOnly?: boolean;
   /** `/dashboard` must match exactly or it would light up on every child route. */
   exact?: boolean;
 }
@@ -49,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/barbers", label: "Barbers", shortLabel: "Barbers", Icon: ScissorsIcon },
   { href: "/dashboard/services", label: "Services", shortLabel: "Services", Icon: TagIcon },
   { href: "/dashboard/clients", label: "Clients", shortLabel: "Clients", Icon: UsersIcon },
+  { href: "/dashboard/earnings", label: "Earnings", shortLabel: "Earnings", Icon: TagIcon, ownerOnly: true },
   { href: "/dashboard/settings", label: "Settings", shortLabel: "Settings", Icon: SettingsIcon },
 ];
 
@@ -71,9 +74,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
       router.replace(`/login?redirectTo=${encodeURIComponent(pathname)}`);
     } else if (user?.role === "SUPER_ADMIN") {
       router.replace("/platform");
+    } else if (user?.role === "CUSTOMER") {
+      router.replace("/");
     }
   }, [isLoading, token, user, pathname, router]);
 
+  const navItems = NAV_ITEMS.filter((item) => !item.ownerOnly || user?.role === "OWNER");
   const displayName = user ? `${user.firstName} ${user.lastName ?? ""}`.trim() : "";
   const salonName = user?.salonName ?? "Salon Admin";
   const shopHref = user?.salonSlug ? `/s/${user.salonSlug}` : "/";
@@ -117,7 +123,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
         <nav aria-label="Admin sections" className="flex-1 overflow-y-auto p-3">
           <ul className="flex flex-col gap-1">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = isActive(pathname, item);
               return (
                 <li key={item.href}>
@@ -228,7 +234,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_12px_rgba(5,59,80,0.08)] lg:hidden"
         >
           <ul className="flex items-stretch">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = isActive(pathname, item);
               return (
                 <li key={item.href} className="min-w-0 flex-1">

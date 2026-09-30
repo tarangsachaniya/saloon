@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       })
     : null;
   // A deactivated salon locks its staff out of the dashboard.
-  if (user.role !== "SUPER_ADMIN" && (!salon || !salon.isActive)) {
+  if (user.role !== "SUPER_ADMIN" && user.role !== "CUSTOMER" && (!salon || !salon.isActive)) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 

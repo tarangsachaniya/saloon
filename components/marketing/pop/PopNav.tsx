@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { signOut, useSessionUser } from "@/lib/auth/useSessionUser";
 import { BRAND } from "@/lib/brand";
 import { popButton } from "./ui";
 
@@ -15,11 +16,23 @@ const LINKS = [
   { href: "/#faq", label: "FAQ" },
 ];
 
+const ghostLink = "rounded-full px-4 py-2 text-sm font-semibold text-plum hover:bg-white/80";
+
+/** Where "Account" leads for each role. */
+function accountHref(role?: string): string | null {
+  if (role === "CUSTOMER") return "/account";
+  if (role === "SUPER_ADMIN") return "/platform";
+  if (role === "OWNER" || role === "STAFF") return "/dashboard";
+  return null;
+}
+
 /** Sticky pill navigation. On scroll it tucks into a floating cream capsule. */
 export function PopNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const { signedIn, user } = useSessionUser();
+  const account = accountHref(user?.role);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -62,9 +75,31 @@ export function PopNav() {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <Link href="/login" className="rounded-full px-4 py-2 text-sm font-semibold text-plum hover:bg-white/80">
-            Sign in
-          </Link>
+          {signedIn ? (
+            <>
+              {account ? (
+                <Link href={account} className={ghostLink}>
+                  Account
+                </Link>
+              ) : (
+                <span className="px-4 py-2 text-sm font-semibold text-plum">
+                  {user?.firstName ? `Hi, ${user.firstName}` : "Account"}
+                </span>
+              )}
+              <button type="button" onClick={signOut} className={ghostLink}>
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className={ghostLink}>
+                Sign in
+              </Link>
+              <Link href="/register" className={ghostLink}>
+                Sign up
+              </Link>
+            </>
+          )}
           <Link href="/contact" className={popButton("tomato", "md")}>
             List your salon
           </Link>
@@ -96,7 +131,17 @@ export function PopNav() {
             transition={{ type: "spring", stiffness: 420, damping: 30 }}
             className="mx-auto mt-2 max-w-7xl rounded-[1.75rem] border-2 border-plum bg-cream p-3 shadow-[4px_4px_0_0_#3b1a3f] lg:hidden"
           >
-            {[...LINKS, { href: "/login", label: "Sign in" }].map((l) => (
+            {[
+              ...LINKS,
+              ...(signedIn
+                ? account
+                  ? [{ href: account, label: "Account" }]
+                  : []
+                : [
+                    { href: "/login", label: "Sign in" },
+                    { href: "/register", label: "Sign up" },
+                  ]),
+            ].map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
@@ -106,6 +151,18 @@ export function PopNav() {
                 {l.label}
               </Link>
             ))}
+            {signedIn && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  signOut();
+                }}
+                className="flex min-h-12 w-full items-center rounded-2xl px-4 font-chunky text-xl font-bold text-plum hover:bg-white"
+              >
+                Log out
+              </button>
+            )}
             <Link href="/contact" onClick={() => setOpen(false)} className={`${popButton("tomato")} mt-2 w-full`}>
               List your salon
             </Link>

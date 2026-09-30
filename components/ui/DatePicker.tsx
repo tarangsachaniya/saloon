@@ -71,10 +71,21 @@ export function Calendar({
     [value],
   );
 
-  // The month on screen. Opens on the selection when there is one.
-  const [viewMonth, setViewMonth] = useState<Date>(() =>
-    startOfMonth(selectedDate ?? min),
-  );
+  // The month on screen. Opens on the selection when there is one, otherwise on
+  // the next month when fewer than 4 days of this one remain - so on the last
+  // day of a month the customer isn't shown an almost empty grid. (The previous
+  // month button still works for today's own cell.)
+  const [viewMonth, setViewMonth] = useState<Date>(() => {
+    if (selectedDate) return startOfMonth(selectedDate);
+    const monthEnd = new Date(min.getFullYear(), min.getMonth() + 1, 0);
+    const daysLeft = Math.round((monthEnd.getTime() - min.getTime()) / 86400000) + 1;
+    if (daysLeft < 4) {
+      const next = new Date(min.getFullYear(), min.getMonth() + 1, 1);
+      const bookableNext = !max || next <= max;
+      if (bookableNext) return next;
+    }
+    return startOfMonth(min);
+  });
 
   const weekdayLabels = useMemo(() => {
     return Array.from(

@@ -102,7 +102,8 @@ export interface BookingContextValue extends BookingState {
   selectBarber: (barber: Barber) => void;
   selectAnyBarber: () => void;
   selectDate: (date: DateString) => void;
-  selectSlot: (slot: Slot) => void;
+  /** `null` clears a slot that turned out to be taken. */
+  selectSlot: (slot: Slot | null) => void;
   setCustomer: (patch: Partial<CustomerDetails>) => void;
   setConfirmedAppointment: (appointment: Appointment | null) => void;
   /** Clear everything (e.g. "book another appointment"). */
@@ -159,7 +160,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const selectSlot = useCallback((slot: Slot) => {
+  const selectSlot = useCallback((slot: Slot | null) => {
     setState((prev) => ({ ...prev, slot }));
   }, []);
 
