@@ -8,6 +8,7 @@ import { APPOINTMENT_INCLUDE } from "@/lib/server/appointments";
 import { sendAppointmentBookedMail } from "@/lib/server/mail";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
 import { resolveSalon } from "@/lib/server/salon";
+import { getOptionalCustomer } from "@/lib/server/auth";
 import { CONSENT_VERSION } from "@/lib/legal/versions";
 import { createAppointmentBodySchema } from "@/lib/server/validation/appointmentValidation";
 
@@ -34,6 +35,16 @@ export async function POST(
     const gate = await resolveSalon(params);
     if ("error" in gate) return gate.error;
     const salon = gate.salon;
+
+    // Booking needs an account: the appointment belongs to the signed-in customer
+    // (taken from the token, never the body), and My Appointments depends on it.
+    const customer = await getOptionalCustomer(request);
+    if (!customer) {
+      return NextResponse.json(
+        { success: false, message: "Please sign in to your customer account to book." },
+        { status: 401 },
+      );
+    }
 
     const parsed = await parseJsonBody<{
       serviceId: string;
@@ -62,7 +73,14 @@ export async function POST(
     } = parsed.body;
 
     // (a)+(b) Re-derive the grid and resolve "any" server-side.
-    const resolved = await availability.resolveBooking({ salonId: salon.id, serviceId, barberId, date, startTime });
+    const resolved = await availability.resolveBooking({
+      salonId: salon.id,
+      serviceId,
+      barberId,
+      date,
+      startTime,
+      bookableOnly: true,
+    });
     if (!resolved.ok) {
       return NextResponse.json(
         { success: false, message: resolved.message },
@@ -85,6 +103,7 @@ export async function POST(
         data: {
           salonId: salon.id,
           clientId: client.id,
+          userId: customer.id,
           barberId: resolved.barberId,
           serviceId: resolved.service.id,
           appointmentDate: availability.parseDateOnly(date),

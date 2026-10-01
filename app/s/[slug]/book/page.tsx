@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BookingStepper,
   BarberSelector,
@@ -10,7 +11,9 @@ import {
   ServiceSelector,
   SlotGrid,
 } from "@/components/booking";
-import { Button } from "@/components/ui";
+import { Loader } from "@/components/ui";
+import { getBarbers, getServices } from "@/lib/api";
+import { useSalon } from "@/lib/salon/SalonContext";
 import {
   BOOKING_STEPS,
   useBooking,
@@ -37,8 +40,19 @@ import {
  * first incomplete step instead of rendering a broken screen.
  */
 export default function BookPage() {
-  const { completedSteps, canGoToStep } = useBooking();
+  const { completedSteps, canGoToStep, selectService, selectBarber } = useBooking();
+  const { slug } = useSalon();
   const [step, setStep] = useState<BookingStep>("service");
+  // "Book again" arrives as ?serviceId=&barberId=. Both are re-fetched from the
+  // salon's CURRENT catalogue (never trusted from the link) and only applied
+  // if still valid; anything else falls back to letting the customer choose.
+  const [preparing, setPreparing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const prefillStarted = useRef(false);
+  const wizardRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const previousStep = useRef<BookingStep>(step);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     const firstIncomplete = BOOKING_STEPS.findIndex(
@@ -54,14 +68,71 @@ export default function BookPage() {
     );
   }, [completedSteps]);
 
-  const navigate = useCallback((target: BookingStep) => {
-    setStep(target);
-    // A step change is a screen change; on a phone the new heading is otherwise
-    // below the fold after a long slot grid.
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }, []);
+  useEffect(() => {
+    if (prefillStarted.current) return;
+    prefillStarted.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const serviceId = params.get("serviceId");
+    const barberId = params.get("barberId");
+    if (!serviceId) return;
+    setPreparing(true);
+
+    (async () => {
+      try {
+        const service = (await getServices(slug)).find((s) => s.id === serviceId);
+        if (!service) {
+          setNotice("That service isn't available any more. Please choose another.");
+          return;
+        }
+        selectService(service);
+        const barber = barberId
+          ? (await getBarbers(slug, service.id)).find((b) => b.id === barberId)
+          : undefined;
+        if (barber) {
+          selectBarber(barber);
+          setStep("date");
+        } else {
+          if (barberId) setNotice("Your previous barber isn't available for this service. Please choose another.");
+          setStep("barber");
+        }
+      } catch {
+        setNotice("We couldn't load your previous booking. Please choose a service.");
+      } finally {
+        setPreparing(false);
+      }
+    })();
+  }, [slug, selectService, selectBarber]);
+
+  const navigate = useCallback((target: BookingStep) => setStep(target), []);
+
+  /*
+   * Scroll + focus on a step change, from ONE place (an effect on `step`) so a
+   * step can never scroll twice however it was reached (card tap, stepper,
+   * Back, "Change" link, or the clamp effect walking the step back).
+   *
+   * The target is the top of the wizard - the progress bar - not the top of the
+   * document, so the salon header is only left behind when it is actually in
+   * the way. If the wizard's top is already comfortably in view (typical on
+   * desktop) nothing moves at all. Smooth unless the visitor prefers reduced
+   * motion; a wheel/touch scroll by the user cancels a smooth scroll natively.
+   */
+  useEffect(() => {
+    if (previousStep.current === step) return; // first render / clamp no-op
+    previousStep.current = step;
+
+    const frame = requestAnimationFrame(() => {
+      const wizard = wizardRef.current;
+      if (wizard) {
+        const top = wizard.getBoundingClientRect().top;
+        if (top < 0 || top > 160) {
+          wizard.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+        }
+      }
+      // Keyboard / screen-reader users land on the new step, without a second scroll.
+      contentRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [step, reduceMotion]);
 
   /** Jump to an arbitrary step (stepper, "change" links) — gated. */
   const goTo = useCallback(
@@ -87,17 +158,35 @@ export default function BookPage() {
   }, [step, navigate]);
 
   const stepIndex = BOOKING_STEPS.indexOf(step);
-  const previousStep = stepIndex > 0 ? BOOKING_STEPS[stepIndex - 1] : null;
+  const backStep = stepIndex > 0 ? BOOKING_STEPS[stepIndex - 1] : null;
 
   return (
-    <div className="mx-auto w-full max-w-4xl flex flex-col gap-6">
+    <div ref={wizardRef} className="mx-auto flex w-full max-w-4xl scroll-mt-4 flex-col gap-6">
+      {notice && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-warning">
+          {notice}
+        </p>
+      )}
+
       <BookingStepper
         current={step}
         onNavigate={goTo}
-        onBack={previousStep ? () => goTo(previousStep) : undefined}
+        onBack={backStep ? () => goTo(backStep) : undefined}
       />
 
-      <div className="w-full">
+      {preparing ? (
+        <Loader label="Preparing your booking…" />
+      ) : (
+        // Keyed by step: a short fade/slide on change (no exit phase, so it never delays the next screen).
+      <motion.div
+        key={step}
+        ref={contentRef}
+        tabIndex={-1}
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="w-full min-w-0 focus:outline-none"
+      >
         {step === "service" && <ServiceSelector onSelected={advance} />}
         {step === "barber" && <BarberSelector onSelected={advance} />}
         {step === "date" && <DateSelector onSelected={advance} />}
@@ -106,7 +195,8 @@ export default function BookPage() {
         )}
         {step === "details" && <CustomerDetailsForm onSubmitted={advance} />}
         {step === "confirm" && <ConfirmationSummary onNavigate={goTo} />}
-      </div>
+      </motion.div>
+      )}
     </div>
   );
 }

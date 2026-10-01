@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { createAppointment, isApiError } from "@/lib/api";
 import { useBooking, type BookingStep } from "@/lib/booking/BookingContext";
 import { useSalon } from "@/lib/salon/SalonContext";
@@ -80,7 +80,13 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
   } = useBooking();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
+  // The failure worth a "choose another time" nudge: the slot/selection was
+  // rejected (4xx), as opposed to a dropped connection or a server fault.
+  const [failure, setFailure] = useState<{ message: string; slotProblem: boolean } | null>(null);
+  // Synchronous guard: `isSubmitting` state only updates on the next render, so
+  // a fast double tap could otherwise fire two POSTs (the second would then be
+  // rejected as "slot taken" even though the first succeeded).
+  const inFlight = useRef(false);
 
   // The step router only reaches this screen once every prerequisite is set;
   // this guard keeps TypeScript honest and covers a stray direct render.
@@ -96,9 +102,10 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
   }
 
   async function handleConfirm() {
+    if (inFlight.current) return;
     if (!service || !barberSelection || !date || !slot) return;
     if (!customer.consent) {
-      setFailure("Please agree to the privacy terms to book.");
+      setFailure({ message: "Please agree to the privacy terms to book.", slotProblem: false });
       return;
     }
 
@@ -121,13 +128,16 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
     // never reach the API.
     const parsed = createAppointmentSchema.safeParse(payload);
     if (!parsed.success) {
-      setFailure(
-        parsed.error.issues[0]?.message ??
+      setFailure({
+        message:
+          parsed.error.issues[0]?.message ??
           "Some booking details are incomplete. Please check the steps above.",
-      );
+        slotProblem: false,
+      });
       return;
     }
 
+    inFlight.current = true;
     setIsSubmitting(true);
     setFailure(null);
 
@@ -140,16 +150,21 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
         return;
       }
 
-      // Business failure (slot taken, validation rejected server-side, …).
-      // Render the API's message verbatim.
-      setFailure(result.message);
+      // Business failure (slot taken, an option that is no longer offered, …).
+      // The API's message is written for customers; show it as is. The time
+      // step refetches on revisit and drops the slot if it is really gone
+      // (see SlotGrid), so no dead selection survives.
+      setFailure({ message: result.message, slotProblem: true });
     } catch (error) {
-      setFailure(
-        isApiError(error)
-          ? error.message
-          : "We couldn't reach the salon just now. Please check your connection and try again.",
-      );
+      const network = isApiError(error) && error.isNetworkError;
+      setFailure({
+        message: network
+          ? "We couldn't reach the salon just now. Please check your connection and try again."
+          : "We couldn't complete your booking. Please try again in a moment.",
+        slotProblem: false,
+      });
     } finally {
+      inFlight.current = false;
       setIsSubmitting(false);
     }
   }
@@ -242,19 +257,23 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
               role="alert"
               className="mt-4 rounded-lg border border-danger/30 bg-red-50 p-3"
             >
-              <p className="text-sm font-bold text-danger">{failure}</p>
-              <p className="mt-1 text-sm text-slate-700">
-                Someone may have just booked this time. Pick another one and
-                you'll be straight through.
-              </p>
-              <Button
-                variant="outline"
-                fullWidth
-                className="mt-3"
-                onClick={() => onNavigate("slot")}
-              >
-                Choose another time
-              </Button>
+              <p className="text-sm font-bold text-danger">{failure.message}</p>
+              {failure.slotProblem && (
+                <>
+                  <p className="mt-1 text-sm text-slate-700">
+                    Someone may have just booked this time. Pick another one and
+                    you&apos;ll be straight through.
+                  </p>
+                  <Button
+                    variant="outline"
+                    fullWidth
+                    className="mt-3"
+                    onClick={() => onNavigate("slot")}
+                  >
+                    Choose another time
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
@@ -265,7 +284,7 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
             isLoading={isSubmitting}
             onClick={handleConfirm}
           >
-            {failure ? "Try again" : "Confirm booking"}
+            {failure && !failure.slotProblem ? "Try again" : "Confirm booking"}
           </Button>
         </Card>
       </div>

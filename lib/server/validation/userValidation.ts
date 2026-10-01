@@ -17,5 +17,6 @@ export const loginBodySchema = z.object({
       /^(?:(?:[^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@(?:(?:\[(?:[0-9]{1,3}\.){3}[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
       { message: "Invalid Email" },
     ),
-  password: z.string().max(20),
+  // Registration allows up to 128 characters, so login must too.
+  password: z.string().max(128),
 });

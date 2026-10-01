@@ -14,11 +14,22 @@ import { PrismaClient } from "@prisma/client";
  * lifetime, which is what we want.
  */
 
+/**
+ * Worker commission is internal: `omit` hides it from EVERY query (including
+ * nested `include: { barber: true }` on public booking responses) unless a
+ * query explicitly opts in with `omit: { commissionPercentage: false }`. Only
+ * the owner-only commission code does that, so a new route can never leak it
+ * by forgetting to strip a field.
+ */
+function createClient() {
+  return new PrismaClient({ omit: { barber: { commissionPercentage: true } } });
+}
+
 const globalForPrisma = globalThis as unknown as {
-  __prisma?: PrismaClient;
+  __prisma?: ReturnType<typeof createClient>;
 };
 
-export const prisma: PrismaClient = globalForPrisma.__prisma ?? new PrismaClient();
+export const prisma = globalForPrisma.__prisma ?? createClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.__prisma = prisma;

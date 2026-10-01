@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { getAvailability } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
 import { useSalon } from "@/lib/salon/SalonContext";
@@ -32,7 +33,7 @@ export interface SlotGridProps {
   onChangeDate: () => void;
 }
 
-function SlotButton({
+export function SlotButton({
   slot,
   selected,
   onSelect,
@@ -91,6 +92,15 @@ export function SlotGrid({ onSelected, onChangeDate }: SlotGridProps) {
         : Promise.resolve(null),
     [slug, serviceId, barberSelection, date],
   );
+
+  // A slot chosen earlier (customer went back) may have been taken since the
+  // grid was last fetched. Drop it rather than leave a stale "completed" step
+  // that would let the customer jump straight to a doomed confirmation.
+  useEffect(() => {
+    if (!data || !selected) return;
+    const stillFree = data.slots.some((s) => s.start === selected.start && s.available);
+    if (!stillFree) selectSlot(null);
+  }, [data, selected, selectSlot]);
 
   function choose(slot: Slot) {
     selectSlot(slot);

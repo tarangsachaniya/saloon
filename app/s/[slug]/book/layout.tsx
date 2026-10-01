@@ -58,7 +58,7 @@ export default async function BookLayout({
             {children}
           </div>
           <p className="mt-6 text-center text-xs text-th-muted">
-            No account needed · You pay at the salon
+            You pay at the salon
           </p>
         </main>
       </div>

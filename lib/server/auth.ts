@@ -130,3 +130,17 @@ export async function getOptionalStaff(request: Request, salonId: string): Promi
     return null;
   }
 }
+
+/**
+ * Soft gate for public endpoints that link the request to a signed-in CUSTOMER
+ * when there is one (e.g. attaching a booking to the customer's account).
+ * Never rejects: no/invalid token or a non-customer simply yields null.
+ */
+export async function getOptionalCustomer(request: Request): Promise<User | null> {
+  try {
+    const user = await loadUserFromRequest(request);
+    return user && user.role === "CUSTOMER" ? user : null;
+  } catch {
+    return null;
+  }
+}

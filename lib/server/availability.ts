@@ -69,6 +69,35 @@ export interface SlotWire {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** 600 -> "10:00" */
+/**
+ * "Now" on the salon's wall clock, as a Date whose LOCAL getters
+ * (getFullYear/getHours/...) read that wall-clock time - the convention the
+ * rest of this engine (and its tests) already uses.
+ *
+ * The server's own clock is not the salon's: on a UTC host (Vercel) using
+ * `new Date()` directly made "today" roll over at the wrong hour and let the
+ * same-day cutoff sit hours behind the slot grid, offering times already past.
+ * Salons have no timezone column yet, so one zone is applied platform-wide
+ * (`SALON_TIMEZONE`, default Asia/Kolkata to match the INR/+91 catalogue).
+ */
+export function salonNow(timeZone = process.env.SALON_TIMEZONE || "Asia/Kolkata", at = new Date()): Date {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+    })
+      .formatToParts(at)
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
+
 export function minutesToHHMM(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -242,7 +271,7 @@ export function computeSlotsForBarber({
   slotIntervalMinutes = 15,
   minimumAdvanceBookingMinutes = 0,
   date,
-  now = new Date(),
+  now = salonNow(),
   isDayOff = false,
   daysOff = null,
 }: {
@@ -337,7 +366,7 @@ export function serializeSlots(slots: SlotInt[]): SlotWire[] {
 export function validateBookingDate({
   date,
   salonSettings,
-  now = new Date(),
+  now = salonNow(),
 }: {
   date: string;
   salonSettings?: { maximumAdvanceBookingDays?: number } | null;
@@ -384,12 +413,19 @@ export async function loadContext({
   barberId = "any",
   date,
   excludeAppointmentId = null,
+  bookableOnly = false,
 }: {
   salonId: string;
   serviceId: string;
   barberId?: string;
   date: string;
   excludeAppointmentId?: string | null;
+  /**
+   * Public customer booking: only ACTIVE services and ACTIVE barbers who
+   * actually perform the service may be booked. Staff flows (reschedule) leave
+   * this off so an existing appointment can still be moved.
+   */
+  bookableOnly?: boolean;
 }) {
   const weekday = weekdayOf(date);
   const dayDate = parseDateOnly(date);
@@ -397,7 +433,9 @@ export async function loadContext({
   const [salonSettings, openingHour, service] = await Promise.all([
     prisma.salonSettings.findUnique({ where: { salonId } }),
     prisma.salonOpeningHour.findUnique({ where: { salonId_weekday: { salonId, weekday } } }),
-    prisma.service.findFirst({ where: { id: serviceId, salonId } }),
+    prisma.service.findFirst({
+      where: { id: serviceId, salonId, ...(bookableOnly ? { isActive: true } : {}) },
+    }),
   ]);
 
   if (!salonSettings) throw new AvailabilityError("Salon settings have not been configured.", 500);
@@ -409,9 +447,21 @@ export async function loadContext({
         where: { salonId, isActive: true, services: { some: { id: serviceId } } },
         orderBy: { id: "asc" },
       })
-    : await prisma.barber.findMany({ where: { id: barberId, salonId }, orderBy: { id: "asc" } });
+    : await prisma.barber.findMany({
+        where: {
+          id: barberId,
+          salonId,
+          ...(bookableOnly ? { isActive: true, services: { some: { id: serviceId } } } : {}),
+        },
+        orderBy: { id: "asc" },
+      });
 
-  if (!wantsAny && barbers.length === 0) throw new AvailabilityError("Barber not found.", 404);
+  if (!wantsAny && barbers.length === 0) {
+    throw new AvailabilityError(
+      bookableOnly ? "That barber isn't available for this service." : "Barber not found.",
+      404,
+    );
+  }
 
   const barberIds = barbers.map((b) => b.id);
   const [workingHours, breaks, daysOff, appointments] = await Promise.all([
@@ -457,8 +507,9 @@ export async function computeAvailabilityDetailed({
   serviceId,
   barberId = "any",
   date,
-  now = new Date(),
+  now = salonNow(),
   excludeAppointmentId = null,
+  bookableOnly = false,
 }: {
   salonId: string;
   serviceId: string;
@@ -466,8 +517,9 @@ export async function computeAvailabilityDetailed({
   date: string;
   now?: Date;
   excludeAppointmentId?: string | null;
+  bookableOnly?: boolean;
 }) {
-  const ctx = await loadContext({ salonId, serviceId, barberId, date, excludeAppointmentId });
+  const ctx = await loadContext({ salonId, serviceId, barberId, date, excludeAppointmentId, bookableOnly });
   const { salonSettings, openingHour, service } = ctx;
 
   const check = validateBookingDate({ date, salonSettings, now });
@@ -512,6 +564,7 @@ export async function computeAvailability(opts: {
   date: string;
   now?: Date;
   excludeAppointmentId?: string | null;
+  bookableOnly?: boolean;
 }) {
   const detailed = await computeAvailabilityDetailed(opts);
   return {
@@ -550,8 +603,9 @@ export async function resolveBooking({
   barberId = "any",
   date,
   startTime,
-  now = new Date(),
+  now = salonNow(),
   excludeAppointmentId = null,
+  bookableOnly = false,
 }: {
   salonId: string;
   serviceId: string;
@@ -560,6 +614,7 @@ export async function resolveBooking({
   startTime: unknown;
   now?: Date;
   excludeAppointmentId?: string | null;
+  bookableOnly?: boolean;
 }): Promise<ResolveBookingResult> {
   const requestedStart = hhmmToMinutes(startTime);
   if (requestedStart === null) {
@@ -575,6 +630,7 @@ export async function resolveBooking({
       date,
       now,
       excludeAppointmentId,
+      bookableOnly,
     });
   } catch (err) {
     if (err instanceof AvailabilityError) {
@@ -614,7 +670,7 @@ export async function resolveAnyBarber({
   serviceId,
   date,
   startTime,
-  now = new Date(),
+  now = salonNow(),
 }: {
   salonId: string;
   serviceId: string;

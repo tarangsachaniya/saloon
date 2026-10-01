@@ -9,7 +9,12 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { getMe, login as loginRequest } from "@/lib/api/auth";
+import {
+  getMe,
+  login as loginRequest,
+  register as registerRequest,
+  verifyTwoFactor as verifyTwoFactorRequest,
+} from "@/lib/api/auth";
 import { isApiError } from "@/lib/api/client";
 import {
   clearToken,
@@ -17,12 +22,13 @@ import {
   getTokenSnapshot,
   setToken,
   subscribe,
+  USER_STORAGE_KEY,
 } from "./token";
 import type { User } from "@/lib/booking/types";
 
 /**
- * Admin/staff auth context. Customers NEVER authenticate — this provider is
- * only meaningful under `/admin/*`.
+ * Auth context for the sign-in/sign-up screens and the staff/platform areas
+ * (salon staff, platform operator and customers).
  *
  * Token handling:
  *   - The JWT lives in a cookie (`sbs_admin_token`) so `middleware.ts` can read
@@ -33,8 +39,6 @@ import type { User } from "@/lib/booking/types";
  *     "unknown user" on refresh. It is display-only; the cookie token is the
  *     sole source of authority, and the server re-validates every request.
  */
-
-const USER_STORAGE_KEY = "sbs_admin_user";
 
 export interface AuthContextValue {
   /** Current JWT, or null when signed out. */
@@ -48,14 +52,24 @@ export interface AuthContextValue {
   /** True while a `login()` call is in flight. */
   isSigningIn: boolean;
   /**
-   * Sign in. Persists the token cookie on success and returns the user.
-   * Throws `ApiError` on bad credentials — callers should catch and display
-   * `error.message`.
+   * Sign in. Persists the token cookie on success and returns the user, or
+   * `{ twoFactorRequired, challenge }` when an authenticator code is still
+   * owed (no session is created yet). Throws `ApiError` on bad credentials —
+   * callers should catch and display `error.message`.
    */
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  /** Redeem a 2FA challenge with the 6-digit code; persists the session. */
+  verifyTwoFactor: (challenge: string, code: string) => Promise<User>;
+  /** Create a CUSTOMER account and sign it in. Throws `ApiError`. */
+  register: (input: RegisterRequest) => Promise<User>;
+  /** Replace the cached profile after an edit (e.g. the account page). */
+  updateUser: (user: User) => void;
   /** Clear the token cookie and cached user. */
   logout: () => void;
 }
+
+export type LoginResult = User | { twoFactorRequired: true; challenge: string };
+type RegisterRequest = Parameters<typeof registerRequest>[0];
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -142,23 +156,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token, isLoading]);
 
+  // Store the token FIRST so any request fired by the redirect target already
+  // carries it.
+  const startSession = useCallback((response: { token: string; user: User }): User => {
+    setToken(response.token);
+    setUser(response.user);
+    writeStoredUser(response.user);
+    return response.user;
+  }, []);
+
   const login = useCallback(
-    async (email: string, password: string): Promise<User> => {
+    async (email: string, password: string): Promise<LoginResult> => {
       setIsSigningIn(true);
       try {
         const response = await loginRequest(email, password);
-        // Store the token FIRST so any request fired by the redirect target
-        // already carries it.
-        setToken(response.token);
-        setUser(response.user);
-        writeStoredUser(response.user);
-        return response.user;
+        if ("twoFactorRequired" in response) {
+          return { twoFactorRequired: true, challenge: response.challenge };
+        }
+        return startSession(response);
       } finally {
         setIsSigningIn(false);
       }
     },
-    [],
+    [startSession],
   );
+
+  const verifyTwoFactor = useCallback(
+    async (challenge: string, code: string): Promise<User> => {
+      setIsSigningIn(true);
+      try {
+        return startSession(await verifyTwoFactorRequest(challenge, code));
+      } finally {
+        setIsSigningIn(false);
+      }
+    },
+    [startSession],
+  );
+
+  const register = useCallback(
+    async (input: RegisterRequest): Promise<User> => {
+      setIsSigningIn(true);
+      try {
+        return startSession(await registerRequest(input));
+      } finally {
+        setIsSigningIn(false);
+      }
+    },
+    [startSession],
+  );
+
+  const updateUser = useCallback((next: User) => {
+    setUser(next);
+    writeStoredUser(next);
+  }, []);
 
   const logout = useCallback(() => {
     clearToken();
@@ -174,9 +224,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       isSigningIn,
       login,
+      verifyTwoFactor,
+      register,
+      updateUser,
       logout,
     }),
-    [token, user, isLoading, isSigningIn, login, logout],
+    [token, user, isLoading, isSigningIn, login, verifyTwoFactor, register, updateUser, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

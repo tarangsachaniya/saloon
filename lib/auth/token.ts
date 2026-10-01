@@ -20,6 +20,9 @@ import Cookies from "js-cookie";
 /** Cookie name shared by the browser store and `middleware.ts`. */
 export const AUTH_COOKIE_NAME = "sbs_admin_token";
 
+/** localStorage key for the display-only cached profile (see AuthProvider). */
+export const USER_STORAGE_KEY = "sbs_admin_user";
+
 /** Cookie lifetime in days. Keep in step with the backend's JWT expiry. */
 const AUTH_COOKIE_MAX_AGE_DAYS = 7;
 

@@ -21,6 +21,7 @@ import prisma from "@/lib/server/prisma";
 import { isExclusionViolation, SLOT_TAKEN_MESSAGE } from "@/lib/server/dbErrors";
 import { toDateString, parseDateOnly, minutesToHHMM } from "@/lib/server/availability";
 import { hashSync } from "@/lib/server/password";
+import { dropCustomer, makeCustomer } from "./customerToken";
 
 import { POST as postAppointment } from "@/app/api/s/[slug]/appointments/route";
 import { POST as postLogin } from "@/app/api/auth/login/route";
@@ -38,10 +39,11 @@ const OWNER_PASSWORD = "TestOwner123!";
 
 let salon: Salon;
 let service: Service;
-let barber: Barber;
+let barber: Omit<Barber, "commissionPercentage">;
 let owner: User;
 let token: string;
 let bookingDate: string;
+let customer: { id: string; token: string };
 
 /** Build the `NextRequest` a Route Handler would have received. */
 function req(
@@ -49,7 +51,9 @@ function req(
   { method = "GET", body, token: bearer }: { method?: string; body?: unknown; token?: string } = {},
 ): NextRequest {
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (bearer) headers.authorization = `Bearer ${bearer}`;
+  // Public booking needs a customer session; default to the fixture customer.
+  const auth = bearer ?? (method === "POST" && path.endsWith("/appointments") ? customer?.token : undefined);
+  if (auth) headers.authorization = `Bearer ${auth}`;
   return new NextRequest(new URL(path, ORIGIN), {
     method,
     headers,
@@ -99,6 +103,7 @@ const book = (overrides: Record<string, unknown> = {}) =>
   ).then(readJson);
 
 beforeAll(async () => {
+  customer = await makeCustomer(RUN);
   salon = await prisma.salon.create({
     data: {
       slug: RUN,
@@ -185,6 +190,7 @@ afterAll(async () => {
     await prisma.service.deleteMany({ where: { salonId: salon.id } });
     await prisma.salon.delete({ where: { id: salon.id } }).catch(() => {});
   }
+  if (customer) await dropCustomer(customer.id);
   await prisma.$disconnect();
 });
 

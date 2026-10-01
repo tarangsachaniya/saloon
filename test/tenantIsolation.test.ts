@@ -10,6 +10,7 @@ import prisma from "@/lib/server/prisma";
 import { hashSync } from "@/lib/server/password";
 import { generateToken } from "@/lib/server/jwt";
 import { parseDateOnly, toDateString } from "@/lib/server/availability";
+import { makeCustomer } from "./customerToken";
 
 import { POST as postAppointment } from "@/app/api/s/[slug]/appointments/route";
 import { GET as getServices } from "@/app/api/s/[slug]/services/route";
@@ -42,10 +43,13 @@ let B: Tenant;
 let superAdmin: User;
 let superToken: string;
 let bookingDate: string;
+let customer: { id: string; token: string };
 
 function req(path: string, opts: { method?: string; body?: unknown; token?: string } = {}) {
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+  // Public booking needs a customer session; default to the fixture customer.
+  const auth = opts.token ?? (opts.method === "POST" && path.endsWith("/appointments") ? customer?.token : undefined);
+  if (auth) headers.authorization = `Bearer ${auth}`;
   return new NextRequest(new URL(path, ORIGIN), {
     method: opts.method ?? "GET",
     headers,
@@ -128,6 +132,7 @@ async function makeTenant(tag: string): Promise<Tenant> {
 }
 
 beforeAll(async () => {
+  customer = await makeCustomer(RUN); // removed by afterAll's `email startsWith RUN`
   const d = new Date();
   d.setDate(d.getDate() + 3);
   bookingDate = toDateString(d);
@@ -274,6 +279,16 @@ describe("public routes are pinned to the slug's salon", () => {
       ),
     );
     expect(wrongBarber.status).toBe(404);
+  });
+
+  test("booking requires a signed-in customer (guest, forged and staff tokens get 401)", async () => {
+    const body = { date: bookingDate, startTime: "11:00", customerName: "G", customerPhone: "55555", consent: true, serviceId: A.serviceId, barberId: "any" };
+    const url = `/api/s/${A.salon.slug}/appointments`;
+    for (const token of ["", "not.a.token", A.token]) {
+      const res = await json(await postAppointment(req(url, { method: "POST", body, token }), slugP(A.salon.slug)));
+      expect(res.status).toBe(401);
+    }
+    expect(await prisma.appointment.count({ where: { salonId: A.salon.id } })).toBe(1);
   });
 
   test("unknown slug and deactivated salon are 404, and its staff are locked out", async () => {

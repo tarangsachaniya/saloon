@@ -40,3 +40,21 @@ export function validateToken(token: string): (JwtPayload & { id?: string }) | n
 export function generateTokenForForgot(user: object): string {
   return jwt.sign(user as JwtPayload, requireSecret(), { expiresIn: "1h" });
 }
+
+/**
+ * Why a token failed, so the reset-password screen can say "expired" (ask for a
+ * new link) rather than a vague "invalid".
+ */
+export function inspectToken(token: string): "valid" | "expired" | "invalid" {
+  try {
+    jwt.verify(token, requireSecret());
+    return "valid";
+  } catch (error) {
+    return error instanceof jwt.TokenExpiredError ? "expired" : "invalid";
+  }
+}
+
+/** Short-lived proof that the password step passed, redeemed by the 2FA step. */
+export function generateTwoFactorChallenge(userId: string): string {
+  return jwt.sign({ id: userId, purpose: "2fa" }, requireSecret(), { expiresIn: "5m" });
+}
