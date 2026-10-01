@@ -166,6 +166,7 @@ export default function BarbersPage() {
                       src={getBarberPhotoUrl(barber)}
                       alt={barber.name}
                       fill
+                      sizes="56px"
                       className="object-cover object-top"
                     />
                   </div>

@@ -287,7 +287,7 @@ function ThankYou() {
         Thank you!
       </motion.h2>
       <motion.p {...rise(0.42)} className="mt-3 max-w-sm text-plum/75">
-        We&apos;ve received your request and will be in touch soon to set up your salon.
+        Thank you for your interest in listing your salon on Salonly. We have received your request and our team will contact you soon.
       </motion.p>
     </div>
   );

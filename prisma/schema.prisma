@@ -111,6 +111,7 @@ model Salon {
   statements   BillingStatement[]
   Review       Review[]
   commissions  WorkerCommission[]
+  request      PlatformLead?
 }
 
 /// What the platform charges a salon. Plans are versioned: a change inserts a
@@ -392,6 +393,17 @@ model PlatformLead {
   consentAt      DateTime
   consentVersion String
   createdAt      DateTime   @default(now())
+  /// Review workflow. NEW/CONTACTED = pending, CONVERTED = approved, DISMISSED = rejected.
+  /// The salon created on approval (one request can only ever create one).
+  salonId         String?   @unique
+  salon           Salon?    @relation(fields: [salonId], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  rejectionReason String?
+  /// Null until a platform admin opens the request: drives the "new request" notification.
+  adminSeenAt     DateTime?
+  /// When the account-access email went out, or why it did not.
+  accessSentAt    DateTime?
+  accessError     String?
 
   @@index([status, createdAt])
 }

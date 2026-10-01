@@ -318,7 +318,11 @@ function BarberForm({
       email,
       photo,
       bio,
-      specializations,
+      // The field is comma-separated text; the schema (and the API) want a list.
+      specializations: specializations
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
       isActive,
       serviceIds,
     });

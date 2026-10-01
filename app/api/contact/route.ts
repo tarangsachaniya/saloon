@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { CONSENT_VERSION } from "@/lib/legal/versions";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
+import { sendAdminNewRequestMail } from "@/lib/server/mail";
 import prisma from "@/lib/server/prisma";
 
 /**
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await prisma.platformLead.create({
+    const lead = await prisma.platformLead.create({
       data: {
         name: body.name,
         salonName: body.salonName,
@@ -66,6 +67,18 @@ export async function POST(request: NextRequest) {
         consentVersion: CONSENT_VERSION,
       },
     });
+
+    // The stored request IS the admin notification (shown as "new" in the platform
+    // admin until opened). The email heads-up is best effort and only sent once the
+    // request is safely stored; its failure never fails the submission.
+    void sendAdminNewRequestMail({
+      salonName: lead.salonName,
+      ownerName: lead.name,
+      city: lead.city,
+      link: `${process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin}/platform/requests`,
+    }).catch((error) =>
+      console.error("[mail] admin notification failed:", error instanceof Error ? error.message : "unknown"),
+    );
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {

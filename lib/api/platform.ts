@@ -118,3 +118,28 @@ export function fieldErrorsOf(error: unknown): Record<string, string> {
   const payload = (error as { payload?: { fieldErrors?: Record<string, string> } })?.payload;
   return payload?.fieldErrors ?? {};
 }
+
+/* --------------------------- Salon listing requests -------------------------- */
+
+/** A "List your salon" request. Leads only: the team contacts the person manually. */
+export interface SalonRequest {
+  id: string;
+  ownerName: string;
+  salonName: string;
+  email: string;
+  phone: string | null;
+  city: string | null;
+  message: string | null;
+  createdAt: string;
+  /** Not opened by an admin yet: the "new request" notification. */
+  isNew: boolean;
+}
+
+export async function listSalonRequests(options?: RequestOptions) {
+  return get<{ requests: SalonRequest[]; counts: { total: number; unseen: number } }>("/platform/requests", options);
+}
+
+/** Opening a request marks its notification as seen. */
+export async function getSalonRequest(id: string, options?: RequestOptions) {
+  return (await get<{ request: SalonRequest }>(`/platform/requests/${encodeURIComponent(id)}`, options)).request;
+}
