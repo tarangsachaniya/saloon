@@ -346,9 +346,13 @@ model User {
   salonId          String?
   salon            Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
   role             UserRole      @default(CUSTOMER)
-  /// TOTP authenticator 2FA. The secret must never leave the server (see publicUser.ts).
+  /// DEPRECATED - 2FA was removed from the app. Columns are kept (unused, safe
+  /// defaults) so no migration touches existing rows; drop in a later migration.
   twoFactorEnabled Boolean       @default(false)
   twoFactorSecret  String?
+  /// Google account id (OIDC `sub`), set only after the user proves ownership of the
+  /// Salonly account (new Google sign-up, or password-confirmed linking).
+  googleId         String?       @unique
   enabled          Boolean       @default(true)
   passToken        String?
   devices          Json?

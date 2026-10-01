@@ -13,7 +13,6 @@ import {
   getMe,
   login as loginRequest,
   register as registerRequest,
-  verifyTwoFactor as verifyTwoFactorRequest,
 } from "@/lib/api/auth";
 import { isApiError } from "@/lib/api/client";
 import {
@@ -52,14 +51,11 @@ export interface AuthContextValue {
   /** True while a `login()` call is in flight. */
   isSigningIn: boolean;
   /**
-   * Sign in. Persists the token cookie on success and returns the user, or
-   * `{ twoFactorRequired, challenge }` when an authenticator code is still
-   * owed (no session is created yet). Throws `ApiError` on bad credentials —
-   * callers should catch and display `error.message`.
+   * Sign in. Persists the token cookie on success and returns the user.
+   * Throws `ApiError` on bad credentials — callers should catch and display
+   * `error.message`.
    */
-  login: (email: string, password: string) => Promise<LoginResult>;
-  /** Redeem a 2FA challenge with the 6-digit code; persists the session. */
-  verifyTwoFactor: (challenge: string, code: string) => Promise<User>;
+  login: (email: string, password: string) => Promise<User>;
   /** Create a CUSTOMER account and sign it in. Throws `ApiError`. */
   register: (input: RegisterRequest) => Promise<User>;
   /** Replace the cached profile after an edit (e.g. the account page). */
@@ -68,7 +64,6 @@ export interface AuthContextValue {
   logout: () => void;
 }
 
-export type LoginResult = User | { twoFactorRequired: true; challenge: string };
 type RegisterRequest = Parameters<typeof registerRequest>[0];
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -166,26 +161,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string): Promise<LoginResult> => {
+    async (email: string, password: string): Promise<User> => {
       setIsSigningIn(true);
       try {
-        const response = await loginRequest(email, password);
-        if ("twoFactorRequired" in response) {
-          return { twoFactorRequired: true, challenge: response.challenge };
-        }
-        return startSession(response);
-      } finally {
-        setIsSigningIn(false);
-      }
-    },
-    [startSession],
-  );
-
-  const verifyTwoFactor = useCallback(
-    async (challenge: string, code: string): Promise<User> => {
-      setIsSigningIn(true);
-      try {
-        return startSession(await verifyTwoFactorRequest(challenge, code));
+        return startSession(await loginRequest(email, password));
       } finally {
         setIsSigningIn(false);
       }
@@ -224,12 +203,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       isSigningIn,
       login,
-      verifyTwoFactor,
       register,
       updateUser,
       logout,
     }),
-    [token, user, isLoading, isSigningIn, login, verifyTwoFactor, register, updateUser, logout],
+    [token, user, isLoading, isSigningIn, login, register, updateUser, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

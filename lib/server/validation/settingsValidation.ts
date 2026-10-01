@@ -19,6 +19,9 @@ export const updateSettingsBodySchema = z
   .object({
     name: z.string().trim().min(1).max(160).optional(),
     logo: z.string().max(500).optional().nullable(),
+    // Image URLs must come from POST /api/uploads (checked in the route against the salon prefix).
+    coverUrl: z.string().max(500).optional().nullable(),
+    gallery: z.array(z.string().max(500)).max(6).optional(),
     phone: z.string().max(30).optional().nullable(),
     email: z.email().max(180).optional().nullable(),
     address: z.string().max(500).optional().nullable(),

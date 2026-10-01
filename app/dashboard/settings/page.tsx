@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
+import { GalleryUploader, ImageUploader } from "@/components/admin/ImageUploader";
 import { RefreshIcon } from "@/components/admin/icons";
 import { FormError, LoadError, PageHeader } from "@/components/admin/PageHeader";
 import { ToastViewport, useToasts } from "@/components/admin/Toast";
@@ -80,6 +80,7 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-5">
           {/* Keyed on the loaded values so a Reload genuinely resets the forms. */}
           <ProfileCard key={`profile-${data.name}`} settings={data} onSaved={push} />
+          <PhotosCard key={`photos-${data.images?.coverUrl ?? ""}-${data.images?.gallery.length ?? 0}`} settings={data} onSaved={push} />
           <RulesCard
             key={`rules-${data.slotIntervalMinutes}`}
             settings={data}
@@ -99,6 +100,50 @@ export default function SettingsPage() {
 }
 
 type Push = (tone: "success" | "danger" | "info", text: string) => void;
+
+/* -------------------------------------------------------------------------- */
+/* Photos (cover + gallery, uploaded to S3)                                   */
+/* -------------------------------------------------------------------------- */
+
+function PhotosCard({ settings, onSaved }: { settings: SalonSettings; onSaved: Push }) {
+  const [cover, setCover] = useState<string | null>(settings.images?.coverUrl ?? null);
+  const [gallery, setGallery] = useState<string[]>(settings.images?.gallery ?? []);
+
+  /** Save right away so an uploaded photo is never lost; throws so the uploader shows the error. */
+  async function save(patch: { coverUrl?: string | null; gallery?: string[] }) {
+    await updateSettings(patch as never);
+    onSaved("success", "Photos saved.");
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Photos</CardTitle>
+        <CardDescription>
+          The cover and gallery shown on your public salon page. JPEG, PNG or WebP, up to 5 MB each.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6">
+        <ImageUploader
+          label="Cover photo"
+          kind="cover"
+          value={cover}
+          onChange={async (url) => {
+            await save({ coverUrl: url });
+            setCover(url);
+          }}
+        />
+        <GalleryUploader
+          values={gallery}
+          onChange={async (urls) => {
+            await save({ gallery: urls });
+            setGallery(urls);
+          }}
+        />
+      </CardContent>
+    </Card>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* Salon profile                                                              */
@@ -218,59 +263,7 @@ function ProfileCard({
             onChange={(event) => setEmail(event.target.value)}
             error={errors.email}
           />
-          <div className="flex flex-col gap-2">
-            <Input
-              label="Logo URL or Path"
-              value={logo}
-              onChange={(event) => setLogo(event.target.value)}
-              error={errors.logo}
-              placeholder="/images/logo-light.png or https://…"
-              hint="Public path (/images/...) or web URL."
-            />
-            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-              <span className="text-[11px] font-semibold text-slate-500">Presets:</span>
-              {[
-                { label: "Light Logo", path: "/images/logo-light.png" },
-                { label: "Dark Logo", path: "/images/logo.png" },
-                { label: "Icon Badge", path: "/images/logo-icon.png" },
-              ].map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => setLogo(preset.path)}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
-                >
-                  {preset.label}
-                </button>
-              ))}
-              {logo && (
-                <button
-                  type="button"
-                  onClick={() => setLogo("")}
-                  className="text-xs text-danger hover:underline ml-1"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {logo && (
-              <div className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-900 p-2 text-white">
-                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white/10 p-1">
-                  <Image
-                    src={logo}
-                    alt="Logo Preview"
-                    fill
-                    className="object-contain"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="block text-xs font-bold text-white">Logo Preview</span>
-                  <span className="block text-[10px] text-slate-400 truncate">{logo}</span>
-                </div>
-              </div>
-            )}
-          </div>
+          <ImageUploader label="Logo" kind="logo" round value={logo || null} onChange={(url) => setLogo(url ?? "")} />
         </div>
 
         <Input

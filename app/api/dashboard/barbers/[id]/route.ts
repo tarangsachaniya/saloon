@@ -4,6 +4,7 @@ import prisma from "@/lib/server/prisma";
 import { requireAdmin } from "@/lib/server/auth";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
 import { BARBER_DETAIL_INCLUDE, scalarFields, scheduleWrites } from "@/lib/server/barbers";
+import { assertOwnImageUrls } from "@/lib/server/s3";
 import { assertServicesInSalon } from "@/lib/server/salon";
 import { updateBarberBodySchema } from "@/lib/server/validation/barberValidation";
 
@@ -56,13 +57,15 @@ export async function PATCH(
     if ("error" in parsed) return parsed.error;
     const body = parsed.body;
 
-    const owned = await prisma.barber.findFirst({ where: { id, salonId }, select: { id: true } });
+    const owned = await prisma.barber.findFirst({ where: { id, salonId }, select: { id: true, photo: true } });
     if (!owned) {
       return NextResponse.json(
         { success: false, message: "Barber not found." },
         { status: 404 },
       );
     }
+    // A new photo must be one this salon uploaded; the stored value stays valid.
+    assertOwnImageUrls(salonId, [body.photo as string | null | undefined], [owned.photo]);
     if (Array.isArray(body.serviceIds)) {
       await assertServicesInSalon(salonId, body.serviceIds as string[]);
     }

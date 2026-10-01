@@ -11,7 +11,6 @@ export interface Account {
   name: string;
   email: string;
   phone: string | null;
-  twoFactorEnabled: boolean;
   status: "Active" | "Disabled";
   memberSince: string;
 }
@@ -30,18 +29,6 @@ export function changePassword(input: {
   confirmPassword: string;
 }): Promise<{ message: string }> {
   return post("/account/password", input);
-}
-
-export function startTwoFactorSetup(): Promise<{ secret: string; qr: string }> {
-  return post("/account/2fa/setup");
-}
-
-export function enableTwoFactor(code: string): Promise<{ message: string }> {
-  return post("/account/2fa/enable", { code });
-}
-
-export function disableTwoFactor(password: string, code: string): Promise<{ message: string }> {
-  return post("/account/2fa/disable", { password, code });
 }
 
 /* ------------------------------ My appointments ----------------------------- */

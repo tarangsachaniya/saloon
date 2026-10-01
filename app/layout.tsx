@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
+import { CookieConsent } from "@/components/consent/CookieConsent";
 
 /**
  * Nunito is the legacy app's body font (it was pulled in via a raw
@@ -38,7 +39,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={nunito.variable} suppressHydrationWarning>
-      <body className="min-h-dvh font-sans">{children}</body>
+      <body className="min-h-dvh font-sans">
+        {children}
+        <CookieConsent />
+      </body>
     </html>
   );
 }

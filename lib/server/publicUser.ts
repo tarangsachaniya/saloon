@@ -22,15 +22,13 @@ export function publicUser(user: User, salon?: { slug: string; name: string } | 
 
 /**
  * What a customer sees about their own account (`/api/account`). Still no
- * password hash, 2FA secret or internal-only columns; `twoFactorEnabled` is a
- * status flag, never the secret.
+ * password hash or internal-only columns.
  */
 export function accountUser(user: User) {
   return {
     ...publicUser(user),
     name: [user.firstName, user.lastName].filter(Boolean).join(" "),
     phone: user.phoneNumber,
-    twoFactorEnabled: user.twoFactorEnabled,
     status: user.enabled ? "Active" : "Disabled",
     memberSince: user.createdAt.toISOString(),
   };

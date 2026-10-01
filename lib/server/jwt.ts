@@ -54,7 +54,13 @@ export function inspectToken(token: string): "valid" | "expired" | "invalid" {
   }
 }
 
-/** Short-lived proof that the password step passed, redeemed by the 2FA step. */
-export function generateTwoFactorChallenge(userId: string): string {
-  return jwt.sign({ id: userId, purpose: "2fa" }, requireSecret(), { expiresIn: "5m" });
+/** Short-lived, purpose-bound token for in-flight flows (e.g. Google OAuth state). */
+export function signPurposeToken(purpose: string, payload: object, expiresIn: number): string {
+  return jwt.sign({ ...payload, purpose }, requireSecret(), { expiresIn });
+}
+
+/** Returns the payload only if the signature, expiry AND purpose all match. */
+export function verifyPurposeToken<T extends object>(token: string, purpose: string): (T & JwtPayload) | null {
+  const decoded = validateToken(token) as (T & JwtPayload & { purpose?: string }) | null;
+  return decoded && decoded.purpose === purpose ? decoded : null;
 }

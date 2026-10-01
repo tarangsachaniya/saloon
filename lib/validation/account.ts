@@ -25,11 +25,3 @@ export const changePasswordSchema = z
     path: ["newPassword"],
     message: "Choose a password different from your current one.",
   });
-
-export const codeSchema = z.object({
-  code: z.string().regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app."),
-});
-
-export const disableTwoFactorSchema = codeSchema.extend({
-  password: z.string().min(1, "Enter your password."),
-});

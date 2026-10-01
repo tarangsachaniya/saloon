@@ -4,6 +4,7 @@ import prisma from "@/lib/server/prisma";
 import { requireAdmin } from "@/lib/server/auth";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
 import { BARBER_DETAIL_INCLUDE, scalarFields, scheduleWrites } from "@/lib/server/barbers";
+import { assertOwnImageUrls } from "@/lib/server/s3";
 import { assertServicesInSalon } from "@/lib/server/salon";
 import { createBarberBodySchema } from "@/lib/server/validation/barberValidation";
 
@@ -43,6 +44,9 @@ export async function POST(request: NextRequest) {
     const parsed = await parseJsonBody<Record<string, unknown>>(request, createBarberBodySchema);
     if ("error" in parsed) return parsed.error;
     const body = parsed.body;
+
+    // A photo must be one this salon uploaded (POST /api/uploads).
+    assertOwnImageUrls(salonId, [body.photo as string | null | undefined]);
 
     if (Array.isArray(body.serviceIds)) {
       await assertServicesInSalon(salonId, body.serviceIds as string[]);

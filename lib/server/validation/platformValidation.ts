@@ -76,6 +76,10 @@ export const updateSalonSchema = z
   .object({
     ...Object.fromEntries(Object.entries(salonProfile).map(([k, v]) => [k, v.optional()])),
     isActive: z.boolean().optional(),
+    // Image URLs must come from POST /api/uploads for this salon (checked in the route).
+    logoUrl: z.string().max(500).optional().nullable(),
+    coverUrl: z.string().max(500).optional().nullable(),
+    gallery: z.array(z.string().max(500)).max(6).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: "Nothing to update" });
 

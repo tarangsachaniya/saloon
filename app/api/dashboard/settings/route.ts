@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import prisma from "@/lib/server/prisma";
 import { requireAdmin } from "@/lib/server/auth";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
+import { assertOwnImageUrls } from "@/lib/server/s3";
 import { loadSettings, POLICY_FIELDS, PROFILE_FIELDS } from "@/lib/server/settings";
 import { updateSettingsBodySchema } from "@/lib/server/validation/settingsValidation";
 
@@ -13,6 +14,15 @@ import { updateSettingsBodySchema } from "@/lib/server/validation/settingsValida
  */
 
 export const dynamic = "force-dynamic";
+
+/** The salon's uploaded images, returned next to the settings so editors can show and replace them. */
+async function loadImages(salonId: string) {
+  const salon = await prisma.salon.findUnique({
+    where: { id: salonId },
+    select: { logoUrl: true, coverUrl: true, gallery: true },
+  });
+  return { logo: salon?.logoUrl ?? null, coverUrl: salon?.coverUrl ?? null, gallery: salon?.gallery ?? [] };
+}
 
 /** GET /api/dashboard/settings — the caller's salon profile, booking policy and hours. */
 export async function GET(request: NextRequest) {
@@ -27,7 +37,10 @@ export async function GET(request: NextRequest) {
         { status: 404 },
       );
     }
-    return NextResponse.json({ success: true, settings, openingHours }, { status: 200 });
+    return NextResponse.json(
+      { success: true, settings, openingHours, images: await loadImages(auth.salonId) },
+      { status: 200 },
+    );
   } catch (error) {
     return handleRouteError(error);
   }
@@ -52,6 +65,18 @@ export async function PATCH(request: NextRequest) {
       if (body[field] !== undefined) profile[field] = body[field];
     }
     if (body.logo !== undefined) profile.logoUrl = body.logo;
+    if (body.coverUrl !== undefined) profile.coverUrl = body.coverUrl;
+    if (body.gallery !== undefined) profile.gallery = body.gallery;
+
+    // New image URLs must be ones this salon uploaded; values already stored stay valid.
+    if (body.logo !== undefined || body.coverUrl !== undefined || body.gallery !== undefined) {
+      const current = await loadImages(salonId);
+      assertOwnImageUrls(
+        salonId,
+        [body.logo as string | null | undefined, body.coverUrl as string | null | undefined, ...((body.gallery as string[] | undefined) ?? [])],
+        [current.logo, current.coverUrl, ...current.gallery],
+      );
+    }
     // `mapUrl` is a direct Salon column — already included via PROFILE_FIELDS.
 
     const policy: Record<string, unknown> = {};
@@ -88,7 +113,10 @@ export async function PATCH(request: NextRequest) {
     });
 
     const { settings, openingHours } = await loadSettings(salonId);
-    return NextResponse.json({ success: true, settings, openingHours }, { status: 200 });
+    return NextResponse.json(
+      { success: true, settings, openingHours, images: await loadImages(salonId) },
+      { status: 200 },
+    );
   } catch (error) {
     return handleRouteError(error);
   }

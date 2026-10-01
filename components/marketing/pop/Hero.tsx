@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRef } from "react";
 
+import { ListSalonLink } from "./ListSalonLink";
 import { popButton } from "./ui";
 
 const spring = { type: "spring", stiffness: 260, damping: 18 } as const;
@@ -111,9 +112,7 @@ export function Hero({ salonCount }: { salonCount: number }) {
             <Link href="/salons" className={popButton("plum")}>
               Find a salon <span aria-hidden="true">→</span>
             </Link>
-            <Link href="/contact" className={popButton("white")}>
-              I own a salon
-            </Link>
+            <ListSalonLink className={popButton("white")}>I own a salon</ListSalonLink>
           </motion.div>
         </div>
 

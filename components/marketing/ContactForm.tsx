@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
@@ -106,19 +107,7 @@ export function ContactForm() {
     }
   }
 
-  if (status === "done") {
-    return (
-      <div role="status" className="rounded-[2rem] border-[3px] border-plum bg-white p-10 text-center shadow-[6px_6px_0_0_#3b1a3f]">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-mint text-plum">
-          <CheckIcon className="h-7 w-7" />
-        </span>
-        <h2 className="mt-6 font-chunky text-3xl font-semibold text-plum">Thank you</h2>
-        <p className="mt-3 text-plum/75">
-          We&apos;ve received your request and will be in touch soon to set up your salon.
-        </p>
-      </div>
-    );
-  }
+  if (status === "done") return <ThankYou />;
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5 rounded-[2rem] border-[3px] border-plum bg-white p-6 shadow-[6px_6px_0_0_#3b1a3f] sm:p-10">
@@ -239,5 +228,67 @@ export function ContactForm() {
         {status === "sending" ? "Sending…" : "Send request"}
       </button>
     </form>
+  );
+}
+
+const CONFETTI = [
+  { x: -92, y: -64, fill: "bg-tomato", size: "h-3 w-3" },
+  { x: 88, y: -72, fill: "bg-butter", size: "h-3.5 w-3.5" },
+  { x: -112, y: 6, fill: "bg-lilac", size: "h-2.5 w-2.5" },
+  { x: 110, y: 14, fill: "bg-tomato", size: "h-2.5 w-2.5" },
+  { x: -70, y: 70, fill: "bg-butter", size: "h-3 w-3" },
+  { x: 74, y: 66, fill: "bg-lilac", size: "h-3 w-3" },
+];
+
+/** Confirmation card: same size as the form it replaces, content centred, with a springy check and confetti. */
+function ThankYou() {
+  const reduce = useReducedMotion();
+  const rise = (delay: number) =>
+    reduce
+      ? {}
+      : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.45, delay } };
+
+  return (
+    <div
+      role="status"
+      className="flex flex-col items-center justify-center rounded-[2rem] border-[3px] border-plum bg-white p-10 text-center shadow-[6px_6px_0_0_#3b1a3f]"
+    >
+      <div className="relative flex h-24 w-24 items-center justify-center">
+        {!reduce &&
+          CONFETTI.map((c, i) => (
+            <motion.span
+              key={i}
+              aria-hidden="true"
+              className={`absolute rounded-full border-2 border-plum ${c.fill} ${c.size}`}
+              initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
+              animate={{ x: c.x, y: c.y, opacity: [0, 1, 1], scale: [0, 1.2, 1] }}
+              transition={{ duration: 0.7, delay: 0.25 + i * 0.05, ease: "easeOut" }}
+            />
+          ))}
+        {!reduce && (
+          <motion.span
+            aria-hidden="true"
+            className="absolute inset-0 rounded-full border-4 border-mint"
+            initial={{ scale: 0.6, opacity: 0.9 }}
+            animate={{ scale: 1.9, opacity: 0 }}
+            transition={{ duration: 1.1, delay: 0.2, ease: "easeOut" }}
+          />
+        )}
+        <motion.span
+          className="relative flex h-20 w-20 items-center justify-center rounded-full border-[3px] border-plum bg-mint text-plum shadow-[3px_3px_0_0_#3b1a3f]"
+          initial={reduce ? false : { scale: 0, rotate: -25 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 260, damping: 14 }}
+        >
+          <CheckIcon className="h-9 w-9" />
+        </motion.span>
+      </div>
+      <motion.h2 {...rise(0.3)} className="mt-6 font-chunky text-4xl font-extrabold text-plum">
+        Thank you!
+      </motion.h2>
+      <motion.p {...rise(0.42)} className="mt-3 max-w-sm text-plum/75">
+        We&apos;ve received your request and will be in touch soon to set up your salon.
+      </motion.p>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { ImageUploader } from "@/components/admin/ImageUploader";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   Button,
@@ -561,62 +561,7 @@ function BarberForm({
                 error={errors.email}
                 hint="Optional."
               />
-              <div className="flex flex-col gap-1.5">
-                <Input
-                  label="Photo URL or Path"
-                  value={photo}
-                  onChange={(event) => setPhoto(event.target.value)}
-                  error={errors.photo}
-                  placeholder="/images/barbers/barber-rahul.jpg or https://…"
-                  hint="Web URL or local path (/images/barbers/...)."
-                />
-
-                {/* Quick Presets */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  <span className="text-[11px] font-semibold text-slate-500">Quick Presets:</span>
-                  {[
-                    { label: "Rahul", path: "/images/barbers/barber-rahul.jpg" },
-                    { label: "Akash", path: "/images/barbers/barber-akash.jpg" },
-                    { label: "Jay", path: "/images/barbers/barber-jay.jpg" },
-                    { label: "Karan", path: "/images/barbers/barber-karan.jpg" },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => setPhoto(preset.path)}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:border-secondary transition-colors"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                  {photo && (
-                    <button
-                      type="button"
-                      onClick={() => setPhoto("")}
-                      className="text-xs text-danger hover:underline ml-1"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                {photo && (
-                  <div className="mt-1 flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-2">
-                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-200">
-                      <Image
-                        src={photo}
-                        alt="Photo Preview"
-                        fill
-                        className="object-cover object-top"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-xs font-bold text-primary">Live Photo Preview</span>
-                      <span className="block text-[11px] text-slate-500 truncate">{photo}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ImageUploader label="Photo" kind="barber" round value={photo || null} onChange={(url) => setPhoto(url ?? "")} />
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">

@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { FadeUp, Marquee } from "@/components/marketing/fx/primitives";
+import { ListSalonLink } from "@/components/marketing/pop/ListSalonLink";
 import { Hero } from "@/components/marketing/pop/Hero";
 import { PopFaq } from "@/components/marketing/pop/PopFaq";
 import { popButton } from "@/components/marketing/pop/ui";
@@ -131,8 +132,7 @@ export default async function MarketingHome() {
               </FadeUp>
             ))}
             <FadeUp delay={0.16}>
-              <Link
-                href="/contact"
+              <ListSalonLink
                 className="group flex h-full min-h-72 flex-col items-center justify-center rounded-[2rem] border-[3px] border-dashed border-plum bg-cream p-8 text-center transition hover:bg-butter"
               >
                 <span className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-plum bg-white text-3xl font-bold text-plum transition group-hover:rotate-90">
@@ -140,7 +140,7 @@ export default async function MarketingHome() {
                 </span>
                 <span className="mt-5 font-chunky text-2xl font-extrabold text-plum">Your salon here?</span>
                 <span className="mt-2 text-plum/75">We&apos;ll set it all up for you.</span>
-              </Link>
+              </ListSalonLink>
             </FadeUp>
           </div>
         </div>
@@ -199,9 +199,7 @@ export default async function MarketingHome() {
                 <span className="rounded-full border-2 border-plum bg-white px-4 py-2 font-bold text-plum">or</span>
                 <span className="rounded-full border-2 border-plum bg-lilac px-4 py-2 font-bold text-plum">Commission</span>
               </div>
-              <Link href="/contact" className={`${popButton("tomato")} mt-10`}>
-                List your salon →
-              </Link>
+              <ListSalonLink className={`${popButton("tomato")} mt-10`}>List your salon →</ListSalonLink>
             </FadeUp>
           </div>
           <div className="grid gap-6 sm:grid-cols-2">
@@ -272,9 +270,7 @@ export default async function MarketingHome() {
               <p className="mx-auto mt-5 max-w-md text-lg font-medium text-plum/85">
                 We set everything up. You just say yes.
               </p>
-              <Link href="/contact" className={`${popButton("butter")} mt-9`}>
-                List your salon →
-              </Link>
+              <ListSalonLink className={`${popButton("butter")} mt-9`}>List your salon →</ListSalonLink>
             </div>
           </div>
         </FadeUp>

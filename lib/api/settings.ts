@@ -1,6 +1,7 @@
 import { get, patch } from "./client";
 import type {
   OpeningHour,
+  SalonImages,
   SalonSettings,
   UpdateSalonSettingsPayload,
 } from "@/lib/booking/types";
@@ -14,12 +15,13 @@ import type { RequestOptions } from "./client";
  */
 type SettingsEnvelope = {
   success: true;
-  settings: Omit<SalonSettings, "openingHours">;
+  settings: Omit<SalonSettings, "openingHours" | "images">;
   openingHours: OpeningHour[];
+  images?: SalonImages;
 };
 
 function mergeSettings(data: SettingsEnvelope): SalonSettings {
-  return { ...data.settings, openingHours: data.openingHours };
+  return { ...data.settings, openingHours: data.openingHours, ...(data.images ? { images: data.images } : {}) };
 }
 
 /**

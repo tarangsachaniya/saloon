@@ -288,6 +288,8 @@ export interface OpeningHour {
 
 /** `GET /api/settings` (and the body shape of `PATCH /api/admin/settings`). */
 export interface SalonSettings {
+  /** Present on the dashboard settings response; the public response uses `look` instead. */
+  images?: SalonImages;
   name: string;
   /**
    * NOTE (M6): these four are `String?` in `prisma/schema.prisma` and the live
@@ -318,7 +320,18 @@ export interface SalonSettings {
   openingHours: OpeningHour[];
 }
 
-export type UpdateSalonSettingsPayload = Partial<SalonSettings>;
+/** Uploaded images of the salon (dashboard settings response only). */
+export interface SalonImages {
+  logo: string | null;
+  coverUrl: string | null;
+  gallery: string[];
+}
+
+export type UpdateSalonSettingsPayload = Partial<Omit<SalonSettings, "images">> & {
+  /** Public URL from an upload (POST /api/uploads), or null to clear. */
+  coverUrl?: string | null;
+  gallery?: string[];
+};
 
 /* -------------------------------------------------------------------------- */
 /* Auth (admin/staff only — customers never authenticate)                      */
@@ -343,14 +356,6 @@ export interface LoginResponse {
   success: true;
   token: string;
   user: User;
-}
-
-/** `POST /api/auth/login` when the account has an authenticator app enabled. */
-export interface TwoFactorRequiredResponse {
-  success: true;
-  twoFactorRequired: true;
-  /** Short-lived proof of the password step, sent back with the code. */
-  challenge: string;
 }
 
 /* -------------------------------------------------------------------------- */

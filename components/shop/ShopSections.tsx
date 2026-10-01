@@ -103,14 +103,28 @@ export function TeamSection({ data }: { data: ShopData }) {
 /* --------------------------------- Gallery -------------------------------- */
 export function GallerySection({ images, name }: { images: string[]; name: string }) {
   if (images.length === 0) return null;
+  const shown = images.slice(0, 6);
+  // The photos are absolutely positioned (`fill`), so every tile needs an explicit
+  // aspect ratio: a tile with `aspect-auto` has no height of its own and collapses
+  // to a thin strip when no sibling sets the row height (e.g. a single photo).
+  const single = shown.length === 1;
   return (
     <section aria-labelledby="gallery-h" className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
       <h2 id="gallery-h" className="sr-only">
         Gallery
       </h2>
       <ul className="grid grid-cols-2 gap-4 md:grid-cols-3">
-        {images.slice(0, 6).map((src, i) => (
-          <li key={src} className={`relative overflow-hidden rounded-th-lg ${i === 0 ? "col-span-2 row-span-2 aspect-square md:aspect-auto" : "aspect-square"}`}>
+        {shown.map((src, i) => (
+          <li
+            key={src}
+            className={`relative overflow-hidden rounded-th-lg ${
+              single
+                ? "col-span-2 aspect-[16/9] md:col-span-3"
+                : i === 0
+                  ? "col-span-2 row-span-2 aspect-square"
+                  : "aspect-square"
+            }`}
+          >
             <Image src={src} alt={`${name} gallery photo ${i + 1}`} fill sizes="(min-width:768px) 33vw, 50vw" className="object-cover" />
           </li>
         ))}

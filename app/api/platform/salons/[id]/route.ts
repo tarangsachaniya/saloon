@@ -4,6 +4,7 @@ import { requireSuperAdmin } from "@/lib/server/auth";
 import { handleRouteError, parseJsonStrict } from "@/lib/server/http";
 import { currentPlan, describePlan, PlatformConflictError, SALON_DETAIL_INCLUDE } from "@/lib/server/platform";
 import prisma from "@/lib/server/prisma";
+import { assertOwnImageUrls } from "@/lib/server/s3";
 import { updateSalonSchema } from "@/lib/server/validation/platformValidation";
 
 /**
@@ -67,10 +68,19 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     if ("error" in parsed) return parsed.error;
     const data = parsed.data as Record<string, unknown>;
 
-    const existing = await prisma.salon.findUnique({ where: { id }, select: { slug: true } });
+    const existing = await prisma.salon.findUnique({
+      where: { id },
+      select: { slug: true, logoUrl: true, coverUrl: true, gallery: true },
+    });
     if (!existing) {
       return NextResponse.json({ success: false, message: "Salon not found." }, { status: 404 });
     }
+    // New image URLs must be ones uploaded for this salon; stored values stay valid.
+    assertOwnImageUrls(
+      id,
+      [data.logoUrl as string | null | undefined, data.coverUrl as string | null | undefined, ...((data.gallery as string[] | undefined) ?? [])],
+      [existing.logoUrl, existing.coverUrl, ...existing.gallery],
+    );
     if (typeof data.slug === "string" && data.slug !== existing.slug) {
       const taken = await prisma.salon.findUnique({ where: { slug: data.slug }, select: { id: true } });
       if (taken) throw new PlatformConflictError(`The address /s/${data.slug} is already taken.`);

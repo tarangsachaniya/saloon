@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/server/prisma";
 import { comSync } from "@/lib/server/password";
-import { generateToken, generateTwoFactorChallenge } from "@/lib/server/jwt";
+import { generateToken } from "@/lib/server/jwt";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
 import { loginBodySchema } from "@/lib/server/validation/userValidation";
 import { publicUser } from "@/lib/server/publicUser";
@@ -60,14 +60,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, message: "This salon is not active." },
         { status: 403 },
-      );
-    }
-
-    // Password is right but an authenticator code is still owed: no session yet.
-    if (user.twoFactorEnabled) {
-      return NextResponse.json(
-        { success: true, twoFactorRequired: true, challenge: generateTwoFactorChallenge(user.id) },
-        { status: 200 },
       );
     }
 

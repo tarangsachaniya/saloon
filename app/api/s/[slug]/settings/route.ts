@@ -27,7 +27,16 @@ export async function GET(
         { status: 404 },
       );
     }
-    return NextResponse.json({ success: true, settings, openingHours }, { status: 200 });
+    // `look` lets non-web clients (the mobile app) render the salon in its own theme.
+    const look = {
+      theme: salon.theme,
+      accentColor: salon.accentColor,
+      tagline: salon.tagline,
+      about: salon.about,
+      coverUrl: salon.coverUrl,
+      gallery: salon.gallery,
+    };
+    return NextResponse.json({ success: true, settings, openingHours, look }, { status: 200 });
   } catch (error) {
     return handleRouteError(error);
   }
