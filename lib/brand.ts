@@ -16,6 +16,25 @@ export const BRAND = {
   },
   /** Statutory grievance contact (DPDP Act / IT Rules): a real person before launch. */
   grievanceEmail: "grievance@salonly.example",
+  /**
+   * Legal identity shown on the legal pages. Every value in square brackets is a
+   * PLACEHOLDER: replace it with the real registered details before launch.
+   */
+  legal: {
+    entityName: "[Registered company name] (operating as Salonly)",
+    registeredAddress: "[Registered office address], Bengaluru, Karnataka, India",
+    gstin: "[GSTIN]",
+    cin: "[CIN / LLPIN, if applicable]",
+    jurisdictionCity: "Bengaluru",
+    jurisdictionState: "Karnataka",
+  },
+  grievanceOfficer: {
+    name: "[Grievance Officer name]",
+    designation: "Grievance Officer",
+    email: "grievance@salonly.example",
+    phone: "+91 90000 00000",
+    hours: "Monday to Saturday, 10:00 to 18:00 IST",
+  },
 } as const;
 
 export const NAV_LINKS = [

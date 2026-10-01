@@ -4,4 +4,7 @@
  * accepted. Bump it whenever the platform's privacy or data-consent pages change
  * materially.
  */
-export const CONSENT_VERSION = "2026-09-29";
+export const CONSENT_VERSION = "2026-10-01";
+
+/** Human-readable date shown as "Last updated" on every legal page. Keep in step with `CONSENT_VERSION`. */
+export const LEGAL_LAST_UPDATED = "1 October 2026";
