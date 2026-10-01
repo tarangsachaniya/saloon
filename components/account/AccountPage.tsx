@@ -11,7 +11,6 @@ import { ChangePasswordForm } from "./ChangePasswordForm";
 import { AppointmentsSection } from "./AppointmentsSection";
 import { LogoutButton } from "./LogoutButton";
 import { ProfileForm } from "./ProfileForm";
-import { TwoFactorSettings } from "./TwoFactorSettings";
 import { useMyAppointments } from "./useMyAppointments";
 
 const TABS = [
@@ -165,12 +164,6 @@ export function AccountPage() {
           <>
             <Card title="Change password">
               <ChangePasswordForm />
-            </Card>
-            <Card>
-              <TwoFactorSettings
-                enabled={account.twoFactorEnabled}
-                onChange={(twoFactorEnabled) => setAccount({ ...account, twoFactorEnabled })}
-              />
             </Card>
           </>
         )}

@@ -2,6 +2,10 @@ import Link from "next/link";
 
 import { BRAND } from "@/lib/brand";
 
+import { CookiePreferencesButton } from "@/components/consent/CookiePreferencesButton";
+
+import { ListSalonLink } from "./ListSalonLink";
+
 const COLUMNS = [
   {
     title: "Explore",
@@ -61,11 +65,20 @@ export function PopFooter() {
                 <ul className="mt-4 space-y-2.5">
                   {c.links.map((l) => (
                     <li key={l.label}>
-                      <Link href={l.href} className="text-sm text-cream/80 transition hover:text-butter">
-                        {l.label}
-                      </Link>
+                      {l.href === "/contact" ? (
+                        <ListSalonLink className="text-sm text-cream/80 transition hover:text-butter">{l.label}</ListSalonLink>
+                      ) : (
+                        <Link href={l.href} className="text-sm text-cream/80 transition hover:text-butter">
+                          {l.label}
+                        </Link>
+                      )}
                     </li>
                   ))}
+                  {c.title === "Legal" && (
+                    <li>
+                      <CookiePreferencesButton className="text-sm text-cream/80 transition hover:text-butter" />
+                    </li>
+                  )}
                 </ul>
               </nav>
             ))}

@@ -345,14 +345,6 @@ export interface LoginResponse {
   user: User;
 }
 
-/** `POST /api/auth/login` when the account has an authenticator app enabled. */
-export interface TwoFactorRequiredResponse {
-  success: true;
-  twoFactorRequired: true;
-  /** Short-lived proof of the password step, sent back with the code. */
-  challenge: string;
-}
-
 /* -------------------------------------------------------------------------- */
 /* Admin write payloads                                                        */
 /* -------------------------------------------------------------------------- */

@@ -4,25 +4,39 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+import { popButton } from "@/components/marketing/pop/ui";
 import { isApiError } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { postAuthDestination, withRedirect } from "@/lib/auth/redirect";
 import type { User } from "@/lib/booking/types";
 import { loginSchema } from "@/lib/validation/admin";
 import { AuthLayout } from "./AuthLayout";
+import { GoogleButton } from "./GoogleButton";
+import { GoogleLinkForm } from "./GoogleLinkForm";
 import { AuthField, FormAlert, SubmitButton, formCardClass, linkClass } from "./fields";
-import { TwoFactorForm } from "./TwoFactorForm";
 import { useAuthForm } from "./useAuthForm";
 
-/** Sign in: email + password, then (only if enabled) the authenticator code. */
+/** Short, safe messages for the `?error=` codes the Google routes redirect back with. */
+const GOOGLE_ERRORS: Record<string, string> = {
+  google_cancelled: "Google sign-in was cancelled.",
+  google_unavailable: "Google sign-in isn't available right now. Please use your email and password.",
+  google_not_allowed: "This account must sign in with its email and password.",
+  account_disabled: "This account is disabled.",
+  google_failed: "We couldn't sign you in with Google. Please try again.",
+};
+
+/** Sign in: email + password. New visitors reach registration from the "Create Account" button. */
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, verifyTwoFactor, isSigningIn } = useAuth();
+  const { login, isSigningIn } = useAuth();
 
   const form = useAuthForm(loginSchema, { email: "", password: "" });
-  const [formError, setFormError] = useState<string | null>(null);
-  const [challenge, setChallenge] = useState<string | null>(null);
+  const errorCode = searchParams.get("error");
+  const [formError, setFormError] = useState<string | null>(
+    errorCode ? (GOOGLE_ERRORS[errorCode] ?? "Something went wrong. Please try again.") : null,
+  );
+  const linkEmail = searchParams.get("google") === "link" ? searchParams.get("email") : null;
 
   function finish(user: User) {
     router.replace(postAuthDestination(user, searchParams.get("redirectTo")));
@@ -36,9 +50,7 @@ export function LoginForm() {
     if (!data) return;
 
     try {
-      const result = await login(data.email, data.password);
-      if ("twoFactorRequired" in result) setChallenge(result.challenge);
-      else finish(result);
+      finish(await login(data.email, data.password));
     } catch (error) {
       setFormError(
         isApiError(error) && error.status !== 0 && error.status < 500 && error.status !== 401
@@ -50,22 +62,18 @@ export function LoginForm() {
     }
   }
 
-  if (challenge) {
+  if (linkEmail) {
     return (
       <AuthLayout
-        badge="Almost there"
+        badge="One more step"
         title={
           <>
-            Enter your <span className="text-tomato">code</span>
+            Link <span className="text-tomato">Google</span>
           </>
         }
-        subtitle="Two-step sign-in is on for this account."
+        subtitle="Confirm it's you to connect Google to your account."
       >
-        <TwoFactorForm
-          loading={isSigningIn}
-          onBack={() => setChallenge(null)}
-          onVerify={async (code) => finish(await verifyTwoFactor(challenge, code))}
-        />
+        <GoogleLinkForm email={linkEmail} redirectTo={searchParams.get("redirectTo")} />
       </AuthLayout>
     );
   }
@@ -95,12 +103,13 @@ export function LoginForm() {
               Forgot your password?
             </Link>
           </p>
-          <p>
-            New to Salonly?{" "}
-            <Link href={withRedirect("/register", searchParams.get("redirectTo"))} className={linkClass}>
-              Create an account
-            </Link>
-          </p>
+          <p>Don&apos;t have an account?</p>
+          <Link
+            href={withRedirect("/register", searchParams.get("redirectTo"))}
+            className={`${popButton("white")} w-full`}
+          >
+            Create Account
+          </Link>
         </>
       }
     >
@@ -126,6 +135,12 @@ export function LoginForm() {
         <SubmitButton loading={isSigningIn} loadingLabel="Signing in…">
           Sign in →
         </SubmitButton>
+        <div className="flex items-center gap-3 text-sm font-bold text-plum/60" role="separator" aria-label="or">
+          <span className="h-0.5 flex-1 rounded bg-plum/15" />
+          OR
+          <span className="h-0.5 flex-1 rounded bg-plum/15" />
+        </div>
+        <GoogleButton redirectTo={searchParams.get("redirectTo")} disabled={isSigningIn} />
       </form>
     </AuthLayout>
   );

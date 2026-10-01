@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { signOut, useSessionUser } from "@/lib/auth/useSessionUser";
 import { BRAND } from "@/lib/brand";
+import { useIsSignedInClient } from "./ListSalonLink";
 import { popButton } from "./ui";
 
 const LINKS = [
@@ -33,6 +34,7 @@ export function PopNav() {
   const [scrolled, setScrolled] = useState(false);
   const { signedIn, user } = useSessionUser();
   const account = accountHref(user?.role);
+  const hideListSalon = useIsSignedInClient();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -95,14 +97,13 @@ export function PopNav() {
               <Link href="/login" className={ghostLink}>
                 Sign in
               </Link>
-              <Link href="/register" className={ghostLink}>
-                Sign up
-              </Link>
             </>
           )}
-          <Link href="/contact" className={popButton("tomato", "md")}>
-            List your salon
-          </Link>
+          {!hideListSalon && (
+            <Link href="/contact" className={popButton("tomato", "md")}>
+              List your salon
+            </Link>
+          )}
         </div>
 
         <button
@@ -137,10 +138,7 @@ export function PopNav() {
                 ? account
                   ? [{ href: account, label: "Account" }]
                   : []
-                : [
-                    { href: "/login", label: "Sign in" },
-                    { href: "/register", label: "Sign up" },
-                  ]),
+                : [{ href: "/login", label: "Sign in" }]),
             ].map((l) => (
               <Link
                 key={l.href}
@@ -163,9 +161,11 @@ export function PopNav() {
                 Log out
               </button>
             )}
-            <Link href="/contact" onClick={() => setOpen(false)} className={`${popButton("tomato")} mt-2 w-full`}>
-              List your salon
-            </Link>
+            {!hideListSalon && (
+              <Link href="/contact" onClick={() => setOpen(false)} className={`${popButton("tomato")} mt-2 w-full`}>
+                List your salon
+              </Link>
+            )}
           </motion.nav>
         )}
       </AnimatePresence>

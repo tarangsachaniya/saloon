@@ -43,7 +43,3 @@ export const resetPasswordSchema = z
     path: ["confirmPassword"],
     message: "Passwords do not match.",
   });
-
-export const twoFactorSchema = z.object({
-  code: z.string().regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app."),
-});

@@ -1,5 +1,5 @@
 import { get, post } from "./client";
-import type { LoginResponse, TwoFactorRequiredResponse, User } from "@/lib/booking/types";
+import type { LoginResponse, User } from "@/lib/booking/types";
 import type { RequestOptions } from "./client";
 
 /**
@@ -8,8 +8,7 @@ import type { RequestOptions } from "./client";
  * Sent with `auth: false` so a stale cookie cannot trigger the client's 401
  * auto-logout path while signing in.
  *
- * Resolves to a session, or to a 2FA challenge when the account has an
- * authenticator app enabled. This function does NOT persist the token. Use
+ * Resolves to a session. This function does NOT persist the token. Use
  * `AuthProvider`'s `login()` (see `lib/auth/AuthProvider.tsx`), which calls
  * this and then stores the token in the cookie so `proxy.ts` can see it.
  */
@@ -17,8 +16,8 @@ export function login(
   email: string,
   password: string,
   options?: RequestOptions,
-): Promise<LoginResponse | TwoFactorRequiredResponse> {
-  return post<LoginResponse | TwoFactorRequiredResponse>(
+): Promise<LoginResponse> {
+  return post<LoginResponse>(
     "/auth/login",
     { email, password },
     { auth: false, ...options },
@@ -45,15 +44,6 @@ export function resetPassword(
   options?: RequestOptions,
 ): Promise<{ message: string }> {
   return post<{ message: string }>("/auth/reset-password", { token, password }, { auth: false, ...options });
-}
-
-/** `POST /api/auth/2fa/verify` — redeems a login challenge with a TOTP code. */
-export function verifyTwoFactor(
-  challenge: string,
-  code: string,
-  options?: RequestOptions,
-): Promise<LoginResponse> {
-  return post<LoginResponse>("/auth/2fa/verify", { challenge, code }, { auth: false, ...options });
 }
 
 /**

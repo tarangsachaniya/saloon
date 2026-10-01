@@ -112,7 +112,7 @@ export default function NewSalonPage() {
           email={created.credentials.email}
           password={created.credentials.temporaryPassword}
         />
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <Link href={`/platform/salons/${created.id}`} className={popButton("plum", "md")}>
             Manage salon →
           </Link>
