@@ -19,10 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     await prisma.platformLead.updateMany({ where: { id, adminSeenAt: null }, data: { adminSeenAt: new Date() } });
-    const lead = await prisma.platformLead.findUnique({
-      where: { id },
-      include: { salon: { select: { id: true, slug: true, name: true } } },
-    });
+    const lead = await prisma.platformLead.findUnique({ where: { id } });
     if (!lead) return NextResponse.json({ success: false, message: "Salon request not found." }, { status: 404 });
     return NextResponse.json({ success: true, request: serializeRequest(lead) }, { status: 200 });
   } catch (error) {

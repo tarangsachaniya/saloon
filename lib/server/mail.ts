@@ -71,33 +71,6 @@ export async function sendMail(message: { to: string; subject: string; text: str
   return { status: "sent" };
 }
 
-const escapeHtml = (value: string) =>
-  value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-
-/** Account access for an approved salon: a one-time link to set a password. No password is ever emailed. */
-export function sendSalonAccessMail(input: { to: string; salonName: string; link: string; ownerName: string }) {
-  const text = [
-    `Hi ${input.ownerName},`,
-    "",
-    "Your Salonly salon account has been approved.",
-    "",
-    `Salon: ${input.salonName}`,
-    `Login: ${input.to}`,
-    "",
-    "Your account is ready. Use the secure link below to set your password and sign in:",
-    input.link,
-    "",
-    "For security the link works once and expires in 7 days. After you set your password you can sign in at any time.",
-  ].join("\n");
-  const html = `<p>Hi ${escapeHtml(input.ownerName)},</p>
-<p>Your Salonly salon account has been approved.</p>
-<p><strong>Salon:</strong> ${escapeHtml(input.salonName)}<br><strong>Login:</strong> ${escapeHtml(input.to)}</p>
-<p>Your account is ready. Use the secure link below to set your password and sign in:</p>
-<p><a href="${escapeHtml(input.link)}">Login / Activate account</a></p>
-<p>For security the link works once and expires in 7 days.</p>`;
-  return sendMail({ to: input.to, subject: `Your Salonly account for ${input.salonName} is approved`, text, html });
-}
-
 /** Heads-up to the platform admin about a new salon request (best effort; the in-app notification is the source of truth). */
 export function sendAdminNewRequestMail(input: { salonName: string; ownerName: string; city: string | null; link: string }) {
   const to = process.env.ADMIN_NOTIFY_EMAIL;

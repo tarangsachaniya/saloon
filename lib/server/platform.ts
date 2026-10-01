@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomInt } from "node:crypto";
-import type { Prisma, PrismaClient, SalonBillingPlan } from "@prisma/client";
+import type { Prisma, SalonBillingPlan } from "@prisma/client";
 
 import { hashSync } from "./password";
 import prisma from "./prisma";
@@ -50,29 +50,21 @@ export class PlatformConflictError extends Error {
  * Creates the salon, its booking settings, a default week of hours, its first
  * billing plan and its OWNER login, all in one transaction. Returns the
  * temporary password exactly once; only its hash is stored.
- *
- * `opts.db` lets a caller run this inside its own transaction (salon-request
- * approval); `opts.password` sets the owner's initial password instead of
- * generating a displayed temporary one.
  */
-export async function createSalonWithOwner(
-  input: CreateSalonInput,
-  opts: { db?: Prisma.TransactionClient | PrismaClient; password?: string } = {},
-) {
-  const db = opts.db ?? prisma;
+export async function createSalonWithOwner(input: CreateSalonInput) {
   const ownerEmail = input.owner.email.trim().toLowerCase();
 
   const [slugTaken, emailTaken] = await Promise.all([
-    db.salon.findUnique({ where: { slug: input.salon.slug }, select: { id: true } }),
-    db.user.findUnique({ where: { email: ownerEmail }, select: { id: true } }),
+    prisma.salon.findUnique({ where: { slug: input.salon.slug }, select: { id: true } }),
+    prisma.user.findUnique({ where: { email: ownerEmail }, select: { id: true } }),
   ]);
   if (slugTaken) throw new PlatformConflictError(`The address /s/${input.salon.slug} is already taken.`);
   if (emailTaken) throw new PlatformConflictError(`A user with the email ${ownerEmail} already exists.`);
 
-  const temporaryPassword = opts.password ?? generateTemporaryPassword();
+  const temporaryPassword = generateTemporaryPassword();
   const s = input.salon;
 
-  const salon = await db.salon.create({
+  const salon = await prisma.salon.create({
     data: {
       slug: s.slug,
       name: s.name,

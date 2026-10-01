@@ -119,14 +119,11 @@ export function fieldErrorsOf(error: unknown): Record<string, string> {
   return payload?.fieldErrors ?? {};
 }
 
-/* ------------------------- Salon requests (approval) ------------------------ */
+/* --------------------------- Salon listing requests -------------------------- */
 
-export type SalonRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
-export type AccessDelivery = "sent" | "not_configured" | "failed" | "not_sent";
-
+/** A "List your salon" request. Leads only: the team contacts the person manually. */
 export interface SalonRequest {
   id: string;
-  status: SalonRequestStatus;
   ownerName: string;
   salonName: string;
   email: string;
@@ -134,47 +131,15 @@ export interface SalonRequest {
   city: string | null;
   message: string | null;
   createdAt: string;
-  reviewedAt: string | null;
-  rejectionReason: string | null;
-  /** Pending and not yet opened by an admin: the "new request" notification. */
+  /** Not opened by an admin yet: the "new request" notification. */
   isNew: boolean;
-  salon: { id: string; slug: string; name: string } | null;
-  access: { delivery: AccessDelivery; sentAt: string | null };
 }
 
-export interface SalonRequestCounts {
-  pending: number;
-  approved: number;
-  rejected: number;
-  unseen: number;
+export async function listSalonRequests(options?: RequestOptions) {
+  return get<{ requests: SalonRequest[]; counts: { total: number; unseen: number } }>("/platform/requests", options);
 }
 
-export interface ApprovalResult {
-  request: SalonRequest;
-  delivery: AccessDelivery;
-  /** One-time link for the owner to set a password (also emailed when email is configured). */
-  activationLink: string;
-}
-
-export async function listSalonRequests(status?: SalonRequestStatus, options?: RequestOptions) {
-  return get<{ requests: SalonRequest[]; counts: SalonRequestCounts }>("/platform/requests", {
-    ...options,
-    query: { status },
-  });
-}
-
+/** Opening a request marks its notification as seen. */
 export async function getSalonRequest(id: string, options?: RequestOptions) {
   return (await get<{ request: SalonRequest }>(`/platform/requests/${encodeURIComponent(id)}`, options)).request;
-}
-
-export function approveSalonRequest(id: string, input: { plan: PlanInput; ownerEmail?: string }) {
-  return post<ApprovalResult>(`/platform/requests/${encodeURIComponent(id)}/approve`, input);
-}
-
-export async function rejectSalonRequest(id: string, reason?: string) {
-  return (await post<{ request: SalonRequest }>(`/platform/requests/${encodeURIComponent(id)}/reject`, { reason })).request;
-}
-
-export function resendSalonRequestAccess(id: string) {
-  return post<ApprovalResult>(`/platform/requests/${encodeURIComponent(id)}/resend-access`, {});
 }

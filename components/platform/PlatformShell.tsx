@@ -38,7 +38,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
-    listSalonRequests("PENDING")
+    listSalonRequests()
       .then((r) => !cancelled && setUnseen(r.counts.unseen))
       .catch(() => undefined);
     return () => {
