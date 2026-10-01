@@ -1,3 +1,4 @@
+import { isPreviewableImageSrc } from "./imageSrc";
 import type { Barber } from "@/lib/booking/types";
 
 /**
@@ -27,7 +28,8 @@ export function getBarberPhotoUrl(barber: Partial<Barber> | null | undefined): s
   if (!barber) return FALLBACK_PORTRAITS[0];
 
   const photo = barber.photo?.trim();
-  if (photo) return photo;
+  // A malformed stored value would make next/image throw; fall back to a default portrait instead.
+  if (photo && isPreviewableImageSrc(photo)) return photo;
 
   const nameKey = (barber.name ?? "").toLowerCase().trim();
   for (const [key, path] of Object.entries(DEFAULT_BARBER_PORTRAITS)) {

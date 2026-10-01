@@ -37,8 +37,8 @@ export function validateToken(token: string): (JwtPayload & { id?: string }) | n
   }
 }
 
-export function generateTokenForForgot(user: object): string {
-  return jwt.sign(user as JwtPayload, requireSecret(), { expiresIn: "1h" });
+export function generateTokenForForgot(user: object, expiresIn: jwt.SignOptions["expiresIn"] = "1h"): string {
+  return jwt.sign(user as JwtPayload, requireSecret(), { expiresIn });
 }
 
 /**

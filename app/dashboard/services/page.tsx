@@ -163,6 +163,7 @@ export default function ServicesPage() {
                             src={getServiceImageUrl(service.category, service.name)}
                             alt=""
                             fill
+                            sizes="40px"
                             className="object-cover"
                           />
                         </div>

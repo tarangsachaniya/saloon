@@ -27,6 +27,7 @@ import type {
   Service,
 } from "@/lib/booking/types";
 import { cn } from "@/lib/utils/cn";
+import { isPreviewableImageSrc, isRemoteImageSrc } from "@/lib/utils/imageSrc";
 import { formatPrice } from "@/lib/utils/format";
 import {
   formatDuration,
@@ -318,7 +319,11 @@ function BarberForm({
       email,
       photo,
       bio,
-      specializations,
+      // The field is comma-separated text; the schema (and the API) want a list.
+      specializations: specializations
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
       isActive,
       serviceIds,
     });
@@ -603,12 +608,16 @@ function BarberForm({
                 {photo && (
                   <div className="mt-1 flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-2">
                     <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-200">
-                      <Image
-                        src={photo}
-                        alt="Photo Preview"
-                        fill
-                        className="object-cover object-top"
-                      />
+                      {isPreviewableImageSrc(photo) && (
+                        <Image
+                          src={photo.trim()}
+                          alt="Photo Preview"
+                          fill
+                          sizes="40px"
+                          unoptimized={isRemoteImageSrc(photo)}
+                          className="object-cover object-top"
+                        />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-bold text-primary">Live Photo Preview</span>

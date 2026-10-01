@@ -172,6 +172,7 @@ export function AppointmentList({
                           src={getBarberPhotoUrl(appointment.barber)}
                           alt=""
                           fill
+                          sizes="28px"
                           className="object-cover object-top"
                         />
                       </div>
@@ -233,6 +234,7 @@ export function AppointmentList({
                       src={getBarberPhotoUrl(appointment.barber)}
                       alt=""
                       fill
+                      sizes="44px"
                       className="object-cover object-top"
                     />
                   </div>
@@ -307,6 +309,7 @@ export function AppointmentTimeline({
                 src={getBarberPhotoUrl(appointment.barber)}
                 alt=""
                 fill
+                sizes="32px"
                 className="object-cover object-top"
               />
             </div>

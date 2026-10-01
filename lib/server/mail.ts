@@ -1,5 +1,7 @@
 import "server-only";
 
+import nodemailer from "nodemailer";
+
 /**
  * Outbound email — deliberately a no-op stub in this migration.
  *
@@ -36,4 +38,70 @@ export async function sendForgotPasswordMail(
   void to;
   void token;
   return NOT_WIRED;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Transactional mail (SMTP)                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type MailResult = { status: "sent" } | { status: "not_configured" };
+
+/**
+ * Sends one email over SMTP when `SMTP_HOST`, `SMTP_USER` and `SMTP_PASS` are
+ * set (optional: `SMTP_PORT`, default 587; `MAIL_FROM`, default the SMTP user).
+ * Without them it sends nothing and says so (`not_configured`), so callers can
+ * tell "not sent" from "sent". A real delivery failure THROWS.
+ */
+export async function sendMail(message: { to: string; subject: string; text: string; html?: string }): Promise<MailResult> {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) return { status: "not_configured" };
+
+  const port = Number(process.env.SMTP_PORT || 587);
+  const transport = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    connectionTimeout: 10_000,
+    socketTimeout: 15_000,
+  });
+  await transport.sendMail({ from: process.env.MAIL_FROM || user, ...message });
+  return { status: "sent" };
+}
+
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+/** Account access for an approved salon: a one-time link to set a password. No password is ever emailed. */
+export function sendSalonAccessMail(input: { to: string; salonName: string; link: string; ownerName: string }) {
+  const text = [
+    `Hi ${input.ownerName},`,
+    "",
+    "Your Salonly salon account has been approved.",
+    "",
+    `Salon: ${input.salonName}`,
+    `Login: ${input.to}`,
+    "",
+    "Your account is ready. Use the secure link below to set your password and sign in:",
+    input.link,
+    "",
+    "For security the link works once and expires in 7 days. After you set your password you can sign in at any time.",
+  ].join("\n");
+  const html = `<p>Hi ${escapeHtml(input.ownerName)},</p>
+<p>Your Salonly salon account has been approved.</p>
+<p><strong>Salon:</strong> ${escapeHtml(input.salonName)}<br><strong>Login:</strong> ${escapeHtml(input.to)}</p>
+<p>Your account is ready. Use the secure link below to set your password and sign in:</p>
+<p><a href="${escapeHtml(input.link)}">Login / Activate account</a></p>
+<p>For security the link works once and expires in 7 days.</p>`;
+  return sendMail({ to: input.to, subject: `Your Salonly account for ${input.salonName} is approved`, text, html });
+}
+
+/** Heads-up to the platform admin about a new salon request (best effort; the in-app notification is the source of truth). */
+export function sendAdminNewRequestMail(input: { salonName: string; ownerName: string; city: string | null; link: string }) {
+  const to = process.env.ADMIN_NOTIFY_EMAIL;
+  if (!to) return Promise.resolve<MailResult>({ status: "not_configured" });
+  const text = `New salon listing request received\n\nSalon: ${input.salonName}\nOwner: ${input.ownerName}\nCity: ${input.city ?? "-"}\n\nReview it: ${input.link}`;
+  return sendMail({ to, subject: `New salon request: ${input.salonName}`, text });
 }

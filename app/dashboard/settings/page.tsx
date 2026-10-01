@@ -27,6 +27,7 @@ import { toErrorMessage, useAdminData } from "@/lib/admin/useAdminData";
 import type { SalonSettings } from "@/lib/booking/types";
 import { normalizeMapInput, osmEmbedUrl, parseLocation } from "@/lib/geo";
 import { formatDuration } from "@/lib/utils/time";
+import { isPreviewableImageSrc, isRemoteImageSrc } from "@/lib/utils/imageSrc";
 import {
   bookingRulesSchema,
   openingHourRowSchema,
@@ -257,12 +258,16 @@ function ProfileCard({
             {logo && (
               <div className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-900 p-2 text-white">
                 <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white/10 p-1">
-                  <Image
-                    src={logo}
-                    alt="Logo Preview"
-                    fill
-                    className="object-contain"
-                  />
+                  {isPreviewableImageSrc(logo) && (
+                    <Image
+                      src={logo.trim()}
+                      alt="Logo Preview"
+                      fill
+                      sizes="40px"
+                      unoptimized={isRemoteImageSrc(logo)}
+                      className="object-contain"
+                    />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="block text-xs font-bold text-white">Logo Preview</span>

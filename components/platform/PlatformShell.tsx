@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
+import { listSalonRequests } from "@/lib/api/platform";
 import { useAuth } from "@/lib/auth/useAuth";
 import { BRAND } from "@/lib/brand";
 
 const NAV = [
   { href: "/platform", label: "Salons", exact: true },
+  { href: "/platform/requests", label: "Salon requests", badge: true },
   { href: "/platform/salons/new", label: "+ New salon" },
 ];
 
@@ -29,6 +31,20 @@ export function PlatformShell({ children }: { children: ReactNode }) {
   }, [isLoading, token, user, pathname, router]);
 
   const ready = !isLoading && token && user?.role === "SUPER_ADMIN";
+
+  // Notification badge: pending requests no admin has opened yet. Re-read on every
+  // navigation, so opening the requests page clears it.
+  const [unseen, setUnseen] = useState(0);
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    listSalonRequests("PENDING")
+      .then((r) => !cancelled && setUnseen(r.counts.unseen))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, pathname]);
 
   return (
     <div className="min-h-dvh bg-cream">
@@ -55,6 +71,14 @@ export function PlatformShell({ children }: { children: ReactNode }) {
                   }`}
                 >
                   {item.label}
+                  {"badge" in item && item.badge && unseen > 0 && (
+                    <span
+                      aria-label={`${unseen} new request${unseen === 1 ? "" : "s"}`}
+                      className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full border-2 border-plum bg-tomato px-1.5 text-xs font-extrabold"
+                    >
+                      {unseen}
+                    </span>
+                  )}
                 </Link>
               );
             })}
