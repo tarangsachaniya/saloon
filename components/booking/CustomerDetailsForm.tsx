@@ -135,7 +135,7 @@ export function CustomerDetailsForm({ onSubmitted }: { onSubmitted: () => void }
         />
 
         <Textarea
-          label="Notes for your barber"
+          label="Notes for your stylist"
           rows={3}
           maxLength={500}
           placeholder="Anything we should know before you arrive?"

@@ -276,7 +276,7 @@ function RescheduleBody({
               </p>
             </div>
           </div>
-          <p className="text-xs text-slate-500">Same service, barber and price. Only the time changes.</p>
+          <p className="text-xs text-slate-500">Same service, stylist and price. Only the time changes.</p>
         </div>
       )}
 

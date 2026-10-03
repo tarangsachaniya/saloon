@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils/cn";
 
 const STEP_LABELS: Record<BookingStep, string> = {
   service: "Service",
-  barber: "Barber",
+  barber: "Stylist",
   date: "Date",
   slot: "Time",
   details: "Details",
@@ -14,7 +14,7 @@ const STEP_LABELS: Record<BookingStep, string> = {
 
 const STEP_HEADINGS: Record<BookingStep, string> = {
   service: "Choose a service",
-  barber: "Choose a barber",
+  barber: "Choose a stylist",
   date: "Choose a date",
   slot: "Choose a time",
   details: "Your details",

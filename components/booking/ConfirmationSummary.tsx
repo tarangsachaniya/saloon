@@ -171,7 +171,7 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
     }
   }
 
-  const barberName = isAnyBarber ? "Any barber" : (barber?.name ?? "—");
+  const barberName = isAnyBarber ? "Any stylist" : (barber?.name ?? "—");
 
   return (
     <StepShell
@@ -202,7 +202,7 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
               onChange={() => onNavigate("service")}
             />
             <SummaryRow
-              label="Barber"
+              label="Stylist"
               value={barberName}
               onChange={() => onNavigate("barber")}
             />

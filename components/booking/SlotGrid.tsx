@@ -109,7 +109,7 @@ export function SlotGrid({ onSelected, onChangeDate }: SlotGridProps) {
 
   const slots = data?.slots ?? [];
   const availableCount = slots.filter((s) => s.available).length;
-  const who = isAnyBarber ? "any barber" : (barber?.name ?? "your barber");
+  const who = isAnyBarber ? "any stylist" : (barber?.name ?? "your stylist");
 
   return (
     <StepShell
@@ -133,7 +133,7 @@ export function SlotGrid({ onSelected, onChangeDate }: SlotGridProps) {
           description={
             isAnyBarber
               ? "The salon is closed or fully booked on this date. Try another day."
-              : `${who} is not working on this date, or is fully booked. Try another day, or go back and choose a different barber.`
+              : `${who} is not working on this date, or is fully booked. Try another day, or go back and choose a different stylist.`
           }
           action={
             <Button variant="outline" onClick={onChangeDate}>

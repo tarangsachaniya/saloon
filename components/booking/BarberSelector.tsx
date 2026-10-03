@@ -28,7 +28,7 @@ export function BarberAvatar({
     >
       <Image
         src={photoUrl}
-        alt={barber?.name ?? "Barber"}
+        alt={barber?.name ?? "Stylist"}
         fill
         className="object-cover object-top"
         sizes={`${size}px`}
@@ -63,27 +63,27 @@ export function BarberSelector({ onSelected }: { onSelected: () => void }) {
 
   return (
     <StepShell
-      title="Choose your barber"
+      title="Choose your stylist"
       description={
         service
-          ? `Showing master barbers qualified for your ${service.name.toLowerCase()}.`
-          : "Choose your favorite craftsman or pick Any Barber for fastest availability."
+          ? `Showing stylists who can do your ${service.name.toLowerCase()}.`
+          : "Choose your favourite stylist, or pick Any Stylist for the fastest availability."
       }
     >
-      {isLoading && <Loader label="Loading available barbers…" />}
+      {isLoading && <Loader label="Loading available stylists…" />}
 
       {error && <StepError message={error} onRetry={reload} />}
 
       {data && data.length === 0 && (
         <EmptyState
-          title="No barbers available for this service"
+          title="No stylists available for this service"
           description="Nobody is currently set up to perform this service. Please go back and choose a different one."
         />
       )}
 
       {data && data.length > 0 && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Any Barber Card */}
+          {/* Any Stylist Card */}
           <button
             type="button"
             onClick={chooseAny}
@@ -121,7 +121,7 @@ export function BarberSelector({ onSelected }: { onSelected: () => void }) {
             {/* Content */}
             <div className="flex flex-1 flex-col p-5">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-lg font-bold text-primary">Any Barber</h3>
+                <h3 className="text-lg font-bold text-primary">Any Stylist</h3>
                 <span className="text-xs font-semibold text-secondary-700">Team Choice</span>
               </div>
 
@@ -187,7 +187,7 @@ export function BarberSelector({ onSelected }: { onSelected: () => void }) {
                 <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-lg font-bold text-primary">{barber.name}</h3>
-                    <span className="text-xs font-semibold text-slate-500">Master Barber</span>
+                    <span className="text-xs font-semibold text-slate-500">Stylist</span>
                   </div>
 
                   <p className="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-2 flex-1">
