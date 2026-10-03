@@ -54,7 +54,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/services", label: "Services", shortLabel: "Services", Icon: TagIcon },
   { href: "/dashboard/clients", label: "Clients", shortLabel: "Clients", Icon: UsersIcon },
   { href: "/dashboard/earnings", label: "Earnings", shortLabel: "Earnings", Icon: TagIcon, ownerOnly: true, workerToo: true },
-  { href: "/dashboard/settings", label: "Settings", shortLabel: "Settings", Icon: SettingsIcon },
+  { href: "/dashboard/settings", label: "Settings", shortLabel: "Settings", Icon: SettingsIcon, ownerOnly: true },
 ];
 
 function isActive(pathname: string, item: NavItem): boolean {

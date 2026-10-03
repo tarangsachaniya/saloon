@@ -576,7 +576,6 @@ export async function computeAvailabilityDetailed({
   now = salonNow(),
   excludeAppointmentId = null,
   bookableOnly = false,
-  staffBooking = false,
   onlineBooking = false,
 }: {
   salonId: string;
@@ -586,8 +585,6 @@ export async function computeAvailabilityDetailed({
   now?: Date;
   excludeAppointmentId?: string | null;
   bookableOnly?: boolean;
-  /** Staff booking a walk-in: the customer minimum-advance notice does not apply. */
-  staffBooking?: boolean;
   /** New customer booking: only workers open for online pre-booking. */
   onlineBooking?: boolean;
 }) {
@@ -607,7 +604,7 @@ export async function computeAvailabilityDetailed({
       existingAppointments: entry.existingAppointments,
       service,
       slotIntervalMinutes: salonSettings.slotIntervalMinutes,
-      minimumAdvanceBookingMinutes: staffBooking ? 0 : salonSettings.minimumAdvanceBookingMinutes,
+      minimumAdvanceBookingMinutes: salonSettings.minimumAdvanceBookingMinutes,
       date,
       now,
       isDayOff: entry.isDayOff,
@@ -682,7 +679,6 @@ export async function resolveBooking({
   now = salonNow(),
   excludeAppointmentId = null,
   bookableOnly = false,
-  staffBooking = false,
   onlineBooking = false,
 }: {
   salonId: string;
@@ -693,7 +689,6 @@ export async function resolveBooking({
   now?: Date;
   excludeAppointmentId?: string | null;
   bookableOnly?: boolean;
-  staffBooking?: boolean;
   onlineBooking?: boolean;
 }): Promise<ResolveBookingResult> {
   const requestedStart = hhmmToMinutes(startTime);
@@ -711,7 +706,6 @@ export async function resolveBooking({
       now,
       excludeAppointmentId,
       bookableOnly,
-      staffBooking,
       onlineBooking,
     });
   } catch (err) {

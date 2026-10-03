@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import { deleteService, getAdminServices, updateService } from "@/lib/api";
 import { toErrorMessage, useAdminData } from "@/lib/admin/useAdminData";
+import { useAuth } from "@/lib/auth/useAuth";
 import type { Service } from "@/lib/booking/types";
 import { cn } from "@/lib/utils/cn";
 import { formatPrice } from "@/lib/utils/format";
@@ -39,6 +40,9 @@ import { getServiceImageUrl } from "@/lib/utils/barberImages";
  */
 export default function ServicesPage() {
   const { toasts, push, dismiss } = useToasts();
+  // Only the owner changes the catalogue; workers see the price list.
+  const { user } = useAuth();
+  const canEdit = user?.role === "OWNER";
 
   const { data, error, isLoading, isRefreshing, refresh } = useAdminData(
     (signal) => getAdminServices({ signal }),
@@ -119,9 +123,11 @@ export default function ServicesPage() {
             >
               Refresh
             </Button>
-            <Button onClick={openCreate} leftIcon={<PlusIcon className="h-4 w-4" />}>
-              Add service
-            </Button>
+            {canEdit && (
+              <Button onClick={openCreate} leftIcon={<PlusIcon className="h-4 w-4" />}>
+                Add service
+              </Button>
+            )}
           </>
         }
       />
@@ -133,8 +139,12 @@ export default function ServicesPage() {
       {data && services.length === 0 && (
         <EmptyState
           title="No services yet"
-          description="Add the first service to open the booking wizard for customers."
-          action={<Button onClick={openCreate}>Add service</Button>}
+          description={
+            canEdit
+              ? "Add the first service to open the booking wizard for customers."
+              : "The owner hasn't added any services yet."
+          }
+          action={canEdit ? <Button onClick={openCreate}>Add service</Button> : undefined}
         />
       )}
 
@@ -198,6 +208,7 @@ export default function ServicesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      {canEdit && (
                       <div className="flex justify-end gap-1.5">
                         <Button
                           size="sm"
@@ -230,6 +241,7 @@ export default function ServicesPage() {
                           </Button>
                         )}
                       </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -262,6 +274,7 @@ export default function ServicesPage() {
                     {service.isActive ? "Bookable" : "Inactive"}
                   </Badge>
                 </div>
+                {canEdit && (
                 <div className="mt-3 flex gap-2">
                   <Button
                     size="sm"
@@ -294,6 +307,7 @@ export default function ServicesPage() {
                     </Button>
                   )}
                 </div>
+                )}
               </li>
             ))}
           </ul>

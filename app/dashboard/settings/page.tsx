@@ -19,11 +19,13 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  EmptyState,
   Input,
   Loader,
 } from "@/components/ui";
 import { getAdminSettings, updateSettings } from "@/lib/api";
 import { toErrorMessage, useAdminData } from "@/lib/admin/useAdminData";
+import { useAuth } from "@/lib/auth/useAuth";
 import type { SalonSettings } from "@/lib/booking/types";
 import { normalizeMapInput, osmEmbedUrl, parseLocation } from "@/lib/geo";
 import { formatDuration } from "@/lib/utils/time";
@@ -47,7 +49,21 @@ import { fieldErrors } from "@/lib/validation/booking";
  * The opening-hours editor is the SAME component the barber schedule uses; see
  * `components/admin/WeeklyHoursEditor.tsx` for why that is shared.
  */
+/** Salon settings are the owner's: a worker login only records its own offline data. */
 export default function SettingsPage() {
+  const { user } = useAuth();
+  if (user && user.role !== "OWNER") {
+    return (
+      <>
+        <PageHeader title="Settings" />
+        <EmptyState title="Owner access only" description="Only the salon owner can change the salon's settings." />
+      </>
+    );
+  }
+  return <SettingsEditor />;
+}
+
+function SettingsEditor() {
   const { toasts, push, dismiss } = useToasts();
 
   const { data, error, isLoading, isRefreshing, refresh } = useAdminData(

@@ -268,17 +268,13 @@ export interface UpdateAppointmentPayload {
   amountCharged?: number | null;
 }
 
-/** Body for `POST /api/dashboard/appointments` (owner/staff recording a walk-in). */
+/** Body for `POST /api/dashboard/appointments` (owner/staff recording a sale already done). */
 export interface CreateWalkInPayload {
-  /** "sale": work already done (completed now); "appointment": book on the calendar. */
-  mode: "sale" | "appointment";
   barberId: string;
   serviceIds: string[];
   customerName?: string | null;
   customerPhone?: string | null;
   amountCharged?: number | null;
-  date?: DateString;
-  startTime?: TimeString;
   notes?: string | null;
 }
 

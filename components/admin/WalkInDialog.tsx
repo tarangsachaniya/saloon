@@ -1,52 +1,43 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Button,
-  DatePicker,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  EmptyState,
   Input,
-  Loader,
   Select,
 } from "@/components/ui";
-import { createWalkIn, getAdminBarberAvailability } from "@/lib/api";
-import { toErrorMessage, useAdminData } from "@/lib/admin/useAdminData";
-import type { Appointment, AvailabilityResponse, Barber, Service } from "@/lib/booking/types";
+import { createWalkIn } from "@/lib/api";
+import { toErrorMessage } from "@/lib/admin/useAdminData";
+import type { Appointment, Barber, Service } from "@/lib/booking/types";
 import { cn } from "@/lib/utils/cn";
 import { formatPrice } from "@/lib/utils/format";
-import { addDays, formatDuration, formatTime12h, startOfToday, toDateString } from "@/lib/utils/time";
-import { formatAdminDate } from "@/lib/admin/format";
+import { formatDuration } from "@/lib/utils/time";
 import { validateFlatAmount } from "./CommissionDialog";
 import { FormError } from "./PageHeader";
 
 /**
- * Record offline work (owner or staff). Customers never do this - they only
- * pre-book online.
+ * Record offline work (owner or worker) that is already done: services, who did
+ * them and what the customer paid. It is saved as COMPLETED at once, off the
+ * calendar, and the worker's commission is created at the rate the owner set.
  *
- *  - "Completed sale": the work is done; it is recorded now as COMPLETED, off
- *    the calendar, and the worker's commission is created at once at the rate
- *    the owner set.
- *  - "Book on calendar": a walk-in waiting for a free chair, put into a real
- *    slot (same availability rules as any booking) and completed later.
+ * Nobody but a customer books ahead (on the website or app), so there is no
+ * calendar option here.
  *
  * The amount defaults to the sum of the service prices; whoever records it can
  * enter what the customer actually paid. Commission is based on that amount.
  */
-
-type Mode = "sale" | "appointment";
 
 export interface WalkInDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   barbers: Barber[];
   services: Service[];
-  maxAdvanceDays: number;
   /** A worker signed in with their own login records only as themselves. */
   lockedBarberId?: string | null;
   onSaved: (appointment: Appointment) => void;
@@ -66,20 +57,15 @@ export function WalkInDialog({ open, onOpenChange, ...rest }: WalkInDialogProps)
 function WalkInForm({
   barbers,
   services,
-  maxAdvanceDays,
   lockedBarberId,
   onClose,
   onSaved,
 }: Omit<WalkInDialogProps, "open" | "onOpenChange"> & { onClose: () => void }) {
-  const today = useMemo(() => startOfToday(), []);
-  const [mode, setMode] = useState<Mode>("sale");
   const [barberId, setBarberId] = useState(lockedBarberId ?? "");
   const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [amountText, setAmountText] = useState<string | null>(null);
-  const [date, setDate] = useState(() => toDateString(today));
-  const [startTime, setStartTime] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -94,19 +80,8 @@ function WalkInForm({
   // Untouched amount follows the service total; once typed, it is the user's.
   const amountShown = amountText ?? (chosen.length ? String(listTotal) : "");
 
-  const serviceKey = serviceIds.join(",");
-  const availability = useAdminData<AvailabilityResponse | null>(
-    (signal) =>
-      mode === "appointment" && barberId && serviceKey && date
-        ? getAdminBarberAvailability(barberId, { serviceIds: serviceKey.split(","), date }, { signal })
-        : Promise.resolve(null),
-    [mode, barberId, serviceKey, date],
-  );
-  const slots = availability.data?.slots ?? [];
-
   function toggleService(id: string) {
     setServiceIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-    setStartTime(null);
   }
 
   async function save() {
@@ -121,7 +96,6 @@ function WalkInForm({
       if ("error" in checked) errors.amount = checked.error;
       else if (checked.value !== listTotal) amountCharged = checked.value;
     }
-    if (mode === "appointment" && !startTime) errors.time = "Pick a time.";
     setFieldErrors(errors);
     if (Object.keys(errors).length) return;
 
@@ -129,70 +103,36 @@ function WalkInForm({
     setError(null);
     try {
       const appointment = await createWalkIn({
-        mode,
         barberId,
         serviceIds,
         customerName: customerName.trim() || null,
         customerPhone: customerPhone.trim() || null,
         ...(amountCharged !== undefined ? { amountCharged } : {}),
-        ...(mode === "appointment" ? { date, startTime: startTime as string } : {}),
       });
       onSaved(appointment);
     } catch (cause) {
       setError(toErrorMessage(cause));
-      if (mode === "appointment") availability.refresh();
     } finally {
       setSaving(false);
     }
   }
 
-  const modes: { id: Mode; label: string; hint: string }[] = [
-    { id: "sale", label: "Completed sale", hint: "Work done — record it now" },
-    { id: "appointment", label: "Book on calendar", hint: "Walk-in waiting for a slot" },
-  ];
-
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Record walk-in</DialogTitle>
+        <DialogTitle>Record walk-in sale</DialogTitle>
         <DialogDescription>
-          Offline work earns the worker&rsquo;s commission just like an online booking.
+          Work already done offline. It earns the worker&rsquo;s commission just like an online booking.
         </DialogDescription>
       </DialogHeader>
 
       <div className="mt-5 flex flex-col gap-4">
-        <div role="radiogroup" aria-label="Walk-in type" className="grid grid-cols-2 gap-2">
-          {modes.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={mode === m.id}
-              disabled={saving}
-              onClick={() => {
-                setMode(m.id);
-                setStartTime(null);
-              }}
-              className={cn(
-                "rounded-xl p-3 text-left ring-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary",
-                mode === m.id ? "bg-primary text-primary-foreground ring-primary" : "bg-surface text-primary ring-slate-200 hover:bg-slate-50",
-              )}
-            >
-              <span className="block text-sm font-bold">{m.label}</span>
-              <span className={cn("block text-xs", mode === m.id ? "opacity-80" : "text-slate-500")}>{m.hint}</span>
-            </button>
-          ))}
-        </div>
-
         <Select
           label="Worker"
           placeholder="Who did the work?"
           options={activeBarbers.map((b) => ({ value: b.id, label: b.name }))}
           value={barberId}
-          onValueChange={(next) => {
-            setBarberId(next);
-            setStartTime(null);
-          }}
+          onValueChange={setBarberId}
           disabled={Boolean(lockedBarberId)}
           error={fieldErrors.barber}
         />
@@ -267,64 +207,6 @@ function WalkInForm({
           />
         </div>
 
-        {mode === "appointment" && (
-          <>
-            <DatePicker
-              label="Date"
-              formatValue={formatAdminDate}
-              value={date}
-              onChange={(next) => {
-                setDate(next);
-                setStartTime(null);
-              }}
-              minDate={today}
-              maxDate={addDays(today, maxAdvanceDays)}
-            />
-            <div>
-              <p className="mb-2 text-sm font-semibold text-primary">Time</p>
-              {(!barberId || chosen.length === 0) && (
-                <p className="text-sm text-slate-500">Choose the worker and services to see free times.</p>
-              )}
-              {availability.isLoading && <Loader label="Checking availability…" />}
-              {availability.error && <FormError message={availability.error} />}
-              {availability.data && slots.length === 0 && (
-                <EmptyState
-                  title="No times on this day"
-                  description="The worker isn't working, the salon is closed, or these services don't fit before closing."
-                />
-              )}
-              {slots.length > 0 && (
-                <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                  {slots.map((slot) => {
-                    const selected = startTime === slot.start;
-                    return (
-                      <li key={slot.start}>
-                        <button
-                          type="button"
-                          disabled={!slot.available || saving}
-                          aria-pressed={slot.available ? selected : undefined}
-                          onClick={() => setStartTime(slot.start)}
-                          className={cn(
-                            "flex min-h-11 w-full items-center justify-center rounded-lg px-1 py-1.5 text-sm font-semibold tabular-nums transition-colors",
-                            "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary",
-                            !slot.available &&
-                              "cursor-not-allowed border border-dashed border-slate-200 bg-slate-50 text-slate-400 line-through",
-                            slot.available && !selected && "border border-slate-300 bg-surface text-primary hover:border-secondary",
-                            selected && "border border-primary bg-primary text-primary-foreground ring-2 ring-primary/25",
-                          )}
-                        >
-                          {formatTime12h(slot.start)}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {fieldErrors.time && <p className="mt-1 text-sm font-semibold text-danger">{fieldErrors.time}</p>}
-            </div>
-          </>
-        )}
-
         <FormError message={error} />
       </div>
 
@@ -333,7 +215,7 @@ function WalkInForm({
           Cancel
         </Button>
         <Button onClick={save} isLoading={saving}>
-          {mode === "sale" ? "Record sale" : "Book walk-in"}
+          Record sale
         </Button>
       </DialogFooter>
     </>

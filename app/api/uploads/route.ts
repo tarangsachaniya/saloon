@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireAdmin, requireSuperAdmin } from "@/lib/server/auth";
+import { requireOwner, requireSuperAdmin } from "@/lib/server/auth";
 import { handleRouteError, parseJsonStrict } from "@/lib/server/http";
 import prisma from "@/lib/server/prisma";
 import {
@@ -15,7 +15,8 @@ import {
 /**
  * POST /api/uploads - a presigned S3 POST for one image.
  *
- * Salon staff upload for their own salon (taken from the token, never the
+ * The salon OWNER uploads for their own salon (workers cannot edit services,
+ * barbers or settings, so they have nothing to upload for) (taken from the token, never the
  * body). The platform operator names the salon in `salonId`. Customers cannot
  * upload. The client then POSTs the file straight to S3 and saves the returned
  * `publicUrl` through the normal settings / barber / platform routes, which
@@ -33,9 +34,9 @@ const bodySchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Staff first; otherwise the platform operator. The second gate's error is
+    // Salon owner first; otherwise the platform operator. The second gate's error is
     // the right one for everyone else (401 without a token, 403 for customers).
-    const staff = await requireAdmin(request);
+    const staff = await requireOwner(request);
     const platform = "error" in staff ? await requireSuperAdmin(request) : null;
     if (platform && "error" in platform) return platform.error;
 

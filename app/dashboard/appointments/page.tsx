@@ -225,7 +225,7 @@ export default function AppointmentsPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => setWalkInOpen(true)} disabled={!reference.data}>
-              Record walk-in
+              Record walk-in sale
             </Button>
             <Button
               variant="outline"
@@ -410,17 +410,12 @@ export default function AppointmentsPage() {
         onOpenChange={setWalkInOpen}
         barbers={reference.data?.barbers ?? []}
         services={reference.data?.services ?? []}
-        maxAdvanceDays={reference.data?.settings.maximumAdvanceBookingDays ?? 30}
         lockedBarberId={user?.barberId}
-        onSaved={(created) => {
+        onSaved={() => {
           setWalkInOpen(false);
-          push(
-            "success",
-            created.status === "COMPLETED"
-              ? "Walk-in recorded — commission added."
-              : `Walk-in booked for ${formatAdminDate(created.appointmentDate)}.`,
-          );
-          if (created.appointmentDate !== date) setDate(created.appointmentDate);
+          push("success", "Sale recorded — commission added.");
+          // A recorded sale is dated today; show it if that is the day on screen.
+          if (date !== toDateString(today)) setDate(toDateString(today));
           else refresh();
         }}
       />

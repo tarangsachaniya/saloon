@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { BarberFormDialog } from "@/components/admin/BarberFormDialog";
 import { CommissionDialog, formatCommissionRate } from "@/components/admin/CommissionDialog";
 import { WorkerLoginDialog } from "@/components/admin/WorkerLoginDialog";
+import { useAuth } from "@/lib/auth/useAuth";
 import type { CommissionRate } from "@/lib/api/commissions";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { PlusIcon, RefreshIcon } from "@/components/admin/icons";
@@ -52,6 +53,9 @@ function rateOf(barber: Barber): CommissionRate {
 }
 
 export default function BarbersPage() {
+  // Only the owner manages the roster; workers see it read-only.
+  const { user } = useAuth();
+  const canEdit = user?.role === "OWNER";
   const { toasts, push, dismiss } = useToasts();
 
   const { data, error, isLoading, isRefreshing, refresh, setData } = useAdminData(
@@ -143,9 +147,11 @@ export default function BarbersPage() {
             >
               Refresh
             </Button>
-            <Button onClick={openCreate} leftIcon={<PlusIcon className="h-4 w-4" />}>
-              Add barber
-            </Button>
+            {canEdit && (
+              <Button onClick={openCreate} leftIcon={<PlusIcon className="h-4 w-4" />}>
+                Add barber
+              </Button>
+            )}
           </>
         }
       />
@@ -157,8 +163,12 @@ export default function BarbersPage() {
       {data && barbers.length === 0 && (
         <EmptyState
           title="No barbers yet"
-          description="Add a barber and set their weekly hours to open up bookable slots."
-          action={<Button onClick={openCreate}>Add barber</Button>}
+          description={
+            canEdit
+              ? "Add a barber and set their weekly hours to open up bookable slots."
+              : "The owner hasn't added any barbers yet."
+          }
+          action={canEdit ? <Button onClick={openCreate}>Add barber</Button> : undefined}
         />
       )}
 
@@ -227,6 +237,7 @@ export default function BarbersPage() {
                   </div>
                 )}
 
+                {canEdit && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button
                     size="sm"
@@ -270,6 +281,7 @@ export default function BarbersPage() {
                     </Button>
                   )}
                 </div>
+                )}
               </Card>
             </li>
           ))}

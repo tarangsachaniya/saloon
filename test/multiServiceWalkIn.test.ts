@@ -290,25 +290,31 @@ describe("walk-ins recorded by owner or staff", () => {
     expect(r.status).toBe(400);
   });
 
-  test("a calendar walk-in takes a real slot; completing it with an amount sets commission", async () => {
-    const r = await walkIn(A, { mode: "appointment", barberId: A.barberId, serviceIds: [A.cutId], date: day, startTime: "16:00" });
-    expect(r.status).toBe(201);
-    expect(r.body.appointment).toMatchObject({ status: "CONFIRMED", source: "WALK_IN", blocksCalendar: true });
-    // it blocks the slot like any booking
-    expect((await book(A, { serviceIds: [A.cutId], barberId: A.barberId, startTime: "16:00" })).status).toBe(409);
-    // staff complete it, entering what was paid
-    const done = await patch(A, r.body.appointment.id, { status: "COMPLETED", amountCharged: 450 }, A.staffToken);
+  test("owner and staff cannot place bookings on the calendar: only customers pre-book", async () => {
+    for (const token of [A.token, A.staffToken]) {
+      // the removed "appointment" mode, and a dated slot without a sale, are both refused
+      expect((await walkIn(A, { mode: "appointment", barberId: A.barberId, serviceIds: [A.cutId], date: day, startTime: "16:00" }, token)).status).toBe(400);
+    }
+    // nothing was created on the calendar
+    const calendar = await prisma.appointment.count({ where: { salonId: A.salonId, source: "WALK_IN", blocksCalendar: true } });
+    expect(calendar).toBe(0);
+  });
+
+  test("staff complete a customer's online booking, entering the amount paid; it is then final", async () => {
+    const online = await book(A, { serviceIds: [A.cutId], barberId: A.barberId, startTime: "16:00" });
+    expect(online.status).toBe(201);
+    const id = online.body.appointment.id;
+    const done = await patch(A, id, { status: "COMPLETED", amountCharged: 450 }, A.staffToken);
     expect(done.status).toBe(200);
-    const c = await commissionFor(r.body.appointment.id);
+    const c = await commissionFor(id);
+    expect(c).toMatchObject({ source: "ONLINE" });
     expect(Number(c!.serviceAmount)).toBe(450);
-    expect(Number(c!.commissionAmount)).toBe(180);
-    // the amount is final once completed
-    expect((await patch(A, r.body.appointment.id, { amountCharged: 1 })).status).toBe(400);
+    expect(Number(c!.commissionAmount)).toBe(180); // 40% of 450
+    expect((await patch(A, id, { amountCharged: 1 })).status).toBe(400);
   });
 
   test("validation and tenant isolation", async () => {
     expect((await walkIn(A, { mode: "sale", barberId: A.barberId, serviceIds: [] })).status).toBe(400);
-    expect((await walkIn(A, { mode: "appointment", barberId: A.barberId, serviceIds: [A.cutId] })).status).toBe(400);
     expect((await walkIn(A, { mode: "sale", barberId: B.barberId, serviceIds: [A.cutId] })).status).toBe(404);
     expect((await walkIn(A, { mode: "sale", barberId: A.barberId, serviceIds: [B.cutId] })).status).toBe(404);
     expect(
@@ -325,19 +331,19 @@ describe("earnings and billing split by source", () => {
 
     const s = await commissionSummary(req("/api/dashboard/commissions/summary", { token: A.token })).then(json);
     const w = s.body.workers.find((x: { id: string }) => x.id === A.barberId);
-    expect(w.onlineCount).toBe(1);
-    expect(w.walkInCount).toBe(4);
+    expect(w.onlineCount).toBe(2);
+    expect(w.walkInCount).toBe(3);
     expect(w.commissionType).toBe("PERCENT");
 
     const walkIns = await listCommissions(req(`/api/dashboard/commissions?barberId=${A.barberId}&source=WALK_IN`, { token: A.token })).then(json);
-    expect(walkIns.body.commissions).toHaveLength(4);
+    expect(walkIns.body.commissions).toHaveLength(3);
     expect(walkIns.body.commissions.every((c: { source: string }) => c.source === "WALK_IN")).toBe(true);
     expect((await listCommissions(req("/api/dashboard/commissions?source=QR", { token: A.token }))).status).toBe(400);
   });
 
   test("the platform bills completed ONLINE bookings only", async () => {
     const totals = await platformBillableTotals(A.salonId);
-    expect(totals).toEqual({ completedBookings: 1, grossRevenue: 500 });
+    expect(totals).toEqual({ completedBookings: 2, grossRevenue: 950 }); // 450 paid + 500 list
   });
 });
 

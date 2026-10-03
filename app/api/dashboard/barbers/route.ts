@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import prisma from "@/lib/server/prisma";
-import { requireAdmin } from "@/lib/server/auth";
+import { requireAdmin, requireOwner } from "@/lib/server/auth";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
 import { BARBER_DETAIL_INCLUDE, scalarFields, scheduleWrites } from "@/lib/server/barbers";
 import { assertOwnImageUrls } from "@/lib/server/s3";
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireOwner(request);
     if ("error" in auth) return auth.error;
     const { salonId } = auth;
 

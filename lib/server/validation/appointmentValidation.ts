@@ -37,11 +37,12 @@ export const createAppointmentBodySchema = z
   })
   .refine(hasServices, { message: "Choose at least one service", path: ["serviceIds"] });
 
-// Owner/staff recording offline work. "sale" = already done, recorded now
-// (COMPLETED, off the calendar); "appointment" = a walk-in put on the calendar.
+// Owner/staff recording offline work: a sale that is already done (COMPLETED,
+// off the calendar). Calendar bookings come only from customers, so there is no
+// "appointment" mode; `mode: "sale"` is still accepted from older clients.
 export const createWalkInBodySchema = z
   .object({
-    mode: z.enum(["sale", "appointment"]),
+    mode: z.literal("sale").optional(),
     barberId: idString,
     serviceIds: serviceIdList,
     // Optional customer: an anonymous walk-in needs none.
@@ -49,7 +50,7 @@ export const createWalkInBodySchema = z
     customerPhone: z.string().trim().min(5).max(20).optional().nullable(),
     // What the customer paid; defaults to the sum of the service prices.
     amountCharged: z.number().min(0).max(10_000_000).optional().nullable(),
-    // "appointment" mode: the calendar slot. "sale" mode: optional, defaults to now.
+    // Optional back-dating; defaults to now (never a future date).
     date: dateString.optional(),
     startTime: timeString.optional(),
     notes: z.string().max(1000).optional().nullable(),
@@ -57,10 +58,6 @@ export const createWalkInBodySchema = z
   .refine((d) => !d.customerPhone || d.customerName, {
     message: "Customer name is required with a phone number",
     path: ["customerName"],
-  })
-  .refine((d) => d.mode === "sale" || (d.date && d.startTime), {
-    message: "date and startTime are required to book a walk-in on the calendar",
-    path: ["startTime"],
   });
 
 // Admin PATCH: status transition and/or reschedule. At least one field.
