@@ -21,6 +21,13 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+/// Where an appointment came from. Only ONLINE bookings are billable by the
+/// platform; worker commission accrues on all of them (see lib/server/billing.ts).
+enum AppointmentSource {
+  ONLINE
+  WALK_IN
+}
+
 enum UserRole {
   SUPER_ADMIN
   OWNER
@@ -193,24 +200,31 @@ model SalonOpeningHour {
 }
 
 model Barber {
-  id                   String   @id @default(uuid())
+  id                   String         @id @default(uuid())
   salonId              String
-  salon                Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  salon                Salon          @relation(fields: [salonId], references: [id], onDelete: Cascade)
   name                 String
   phone                String?
   email                String?
   photo                String?
   bio                  String?
   specializations      String[]
-  isActive             Boolean  @default(true)
+  isActive             Boolean        @default(true)
+  /// Customers may pre-book this worker online. Off = walk-ins only.
+  onlineBookingEnabled Boolean        @default(true)
   /// Share of each completed service the worker earns (0-100). INTERNAL: omitted
   /// from every query by default (see lib/server/prisma.ts); only the owner
   /// commission routes opt in.
-  commissionPercentage Decimal  @default(0) @db.Decimal(5, 2)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  commissionPercentage Decimal        @default(0) @db.Decimal(5, 2)
+  /// PERCENT of the amount charged, or FLAT amount per service performed.
+  /// INTERNAL like commissionPercentage (omitted by default).
+  commissionType       CommissionType @default(PERCENT)
+  commissionFlatAmount Decimal        @default(0) @db.Decimal(10, 2)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
   commissions  WorkerCommission[]
+  login        User?
   services     Service[]           @relation("BarberServices")
   workingHours BarberWorkingHour[]
   breaks       BarberBreak[]
@@ -266,8 +280,9 @@ model Service {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  barbers      Barber[]      @relation("BarberServices")
-  appointments Appointment[]
+  barbers          Barber[]             @relation("BarberServices")
+  appointments     Appointment[]
+  appointmentItems AppointmentService[]
 }
 
 model Client {
@@ -289,37 +304,50 @@ model Client {
 }
 
 model Appointment {
-  id              String            @id @default(uuid())
+  id              String               @id @default(uuid())
   salonId         String
-  salon           Salon             @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  clientId        String
-  client          Client            @relation(fields: [clientId], references: [id])
+  salon           Salon                @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  /// Null for an anonymous walk-in.
+  clientId        String?
+  client          Client?              @relation(fields: [clientId], references: [id])
   barberId        String
-  barber          Barber            @relation(fields: [barberId], references: [id])
+  barber          Barber               @relation(fields: [barberId], references: [id])
+  /// The FIRST service of the booking (kept for older clients); the full list is `services`.
   serviceId       String
-  service         Service           @relation(fields: [serviceId], references: [id])
-  appointmentDate DateTime          @db.Date
+  service         Service              @relation(fields: [serviceId], references: [id])
+  services        AppointmentService[]
+  appointmentDate DateTime             @db.Date
   startTime       Int
   endTime         Int
+  /// Totals over all `services`.
   durationMinutes Int
-  price           Decimal           @db.Decimal(10, 2)
-  status          AppointmentStatus @default(CONFIRMED)
+  price           Decimal              @db.Decimal(10, 2)
+  /// What the salon actually charged, when the owner overrides `price`. Commission uses `amountCharged ?? price`.
+  amountCharged   Decimal?             @db.Decimal(10, 2)
+  status          AppointmentStatus    @default(CONFIRMED)
+  source          AppointmentSource    @default(ONLINE)
+  /// False for quick sales: they are recorded after the fact, not scheduled, and
+  /// are left out of the overlap EXCLUDE constraint.
+  blocksCalendar  Boolean              @default(true)
+  /// The owner/staff user who logged or confirmed an offline entry.
+  recordedById    String?
+  recordedBy      User?                @relation("AppointmentRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
   notes           String?
   /// Data-processing consent captured at booking (DPDP / GDPR-style record).
   consentAt       DateTime?
   consentVersion  String?
-  marketingOptIn  Boolean           @default(false)
+  marketingOptIn  Boolean              @default(false)
   /// Random one-time token letting the (unauthenticated) customer review after COMPLETED.
   /// The signed-in customer who booked (null for guest bookings and everything
   /// booked before accounts existed). The ONLY basis for "my appointments":
   /// matching on the phone number would let anyone claim a number they don't own.
   userId          String?
-  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  reviewToken     String?           @unique
+  user            User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reviewToken     String?              @unique
   commission      WorkerCommission?
   review          Review?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   // NOTE: a generated `slotRange tsrange` column + a Postgres EXCLUDE USING gist
   // constraint on (barberId, slotRange) WHERE status NOT IN (CANCELLED, NO_SHOW)
@@ -332,34 +360,55 @@ model Appointment {
   @@index([clientId])
   @@index([salonId, appointmentDate])
   @@index([userId, appointmentDate])
+  @@index([salonId, source, status])
+}
+
+/// One service of an appointment; name/price/duration are snapshots at booking.
+model AppointmentService {
+  id              String      @id @default(uuid())
+  appointmentId   String
+  appointment     Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  serviceId       String
+  service         Service     @relation(fields: [serviceId], references: [id])
+  name            String
+  price           Decimal     @db.Decimal(10, 2)
+  durationMinutes Int
+  sortOrder       Int         @default(0)
+
+  @@index([appointmentId])
+  @@index([serviceId])
 }
 
 /// Single auth table: platform admins, salon owners/staff and (Phase 1) customers.
 /// Customers have salonId = null and role CUSTOMER (the default).
 model User {
-  id               String        @id @default(uuid())
-  firstName        String
-  lastName         String?
-  email            String        @unique
-  password         String
-  phoneNumber      String?
+  id                   String        @id @default(uuid())
+  firstName            String
+  lastName             String?
+  email                String        @unique
+  password             String
+  phoneNumber          String?
   /// Null for SUPER_ADMIN (platform-level); required for OWNER/STAFF.
-  salonId          String?
-  salon            Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  role             UserRole      @default(CUSTOMER)
+  salonId              String?
+  salon                Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  role                 UserRole      @default(CUSTOMER)
+  /// STAFF only: the worker this login belongs to (created by the owner).
+  barberId             String?       @unique
+  barber               Barber?       @relation(fields: [barberId], references: [id], onDelete: SetNull)
   /// DEPRECATED - 2FA was removed from the app. Columns are kept (unused, safe
   /// defaults) so no migration touches existing rows; drop in a later migration.
-  twoFactorEnabled Boolean       @default(false)
-  twoFactorSecret  String?
+  twoFactorEnabled     Boolean       @default(false)
+  twoFactorSecret      String?
   /// Google account id (OIDC `sub`), set only after the user proves ownership of the
   /// Salonly account (new Google sign-up, or password-confirmed linking).
-  googleId         String?       @unique
-  enabled          Boolean       @default(true)
-  passToken        String?
-  devices          Json?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  Appointment      Appointment[]
+  googleId             String?       @unique
+  enabled              Boolean       @default(true)
+  passToken            String?
+  devices              Json?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  Appointment          Appointment[]
+  recordedAppointments Appointment[] @relation("AppointmentRecordedBy")
 }
 
 /// One customer review per completed appointment, shown on the salon page.
@@ -382,21 +431,21 @@ model Review {
 
 /// A "list your salon" enquiry from the marketing site. Platform-level (no salonId).
 model PlatformLead {
-  id             String     @id @default(uuid())
-  name           String
-  salonName      String
-  email          String
-  phone          String?
-  city           String?
-  message        String?
-  status         LeadStatus @default(NEW)
-  consentAt      DateTime
-  consentVersion String
-  createdAt      DateTime   @default(now())
+  id              String     @id @default(uuid())
+  name            String
+  salonName       String
+  email           String
+  phone           String?
+  city            String?
+  message         String?
+  status          LeadStatus @default(NEW)
+  consentAt       DateTime
+  consentVersion  String
+  createdAt       DateTime   @default(now())
   /// Review workflow. NEW/CONTACTED = pending, CONVERTED = approved, DISMISSED = rejected.
   /// The salon created on approval (one request can only ever create one).
-  salonId         String?   @unique
-  salon           Salon?    @relation(fields: [salonId], references: [id], onDelete: SetNull)
+  salonId         String?    @unique
+  salon           Salon?     @relation(fields: [salonId], references: [id], onDelete: SetNull)
   reviewedAt      DateTime?
   rejectionReason String?
   /// Null until a platform admin opens the request: drives the "new request" notification.
@@ -422,6 +471,10 @@ model WorkerCommission {
   commissionPercentage Decimal                @db.Decimal(5, 2)
   serviceAmount        Decimal                @db.Decimal(10, 2)
   commissionAmount     Decimal                @db.Decimal(10, 2)
+  commissionType       CommissionType         @default(PERCENT)
+  flatAmount           Decimal                @default(0) @db.Decimal(10, 2)
+  serviceCount         Int                    @default(1)
+  source               AppointmentSource      @default(ONLINE)
   status               WorkerCommissionStatus @default(PENDING)
   paidAt               DateTime?
   createdAt            DateTime               @default(now())

@@ -9,9 +9,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Badge,
+  Input,
   StatusPill,
   Textarea,
 } from "@/components/ui";
+import { validateFlatAmount } from "./CommissionDialog";
 import { updateAppointment } from "@/lib/api";
 import { actionLabel, allowedTransitions, isTerminal } from "@/lib/admin/transitions";
 import { toErrorMessage } from "@/lib/admin/useAdminData";
@@ -20,6 +23,7 @@ import { formatPrice } from "@/lib/utils/format";
 import { formatDuration, formatTime12h } from "@/lib/utils/time";
 import { formatAdminDate } from "@/lib/admin/format";
 import { FormError } from "./PageHeader";
+import { appointmentServiceNames } from "@/lib/booking/serviceNames";
 
 /**
  * One appointment in full: who, what, when, the complete set of legal status
@@ -94,16 +98,39 @@ function DetailBody({
   const [error, setError] = useState<string | null>(null);
   const [pendingStatus, setPendingStatus] = useState<AppointmentStatus | null>(null);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  // What the customer actually paid. Editable until the visit is completed:
+  // commission is snapshotted from it at completion, at the owner's rate.
+  const storedAmount = appointment.amountCharged ?? appointment.price;
+  const [amountText, setAmountText] = useState(String(storedAmount));
+  const [amountError, setAmountError] = useState<string | undefined>();
 
   const transitions = allowedTransitions(appointment.status);
   const notesChanged = notes.trim() !== (appointment.notes ?? "").trim();
   const isBusy = pendingStatus !== null || isSavingNotes;
+  const amountEditable = appointment.status !== "COMPLETED";
+
+  /** undefined = unchanged; null = invalid (error shown); number = new amount. */
+  function amountChange(): number | undefined | null {
+    const checked = validateFlatAmount(amountText);
+    if ("error" in checked) {
+      setAmountError(checked.error);
+      return null;
+    }
+    setAmountError(undefined);
+    return checked.value === Number(storedAmount) ? undefined : checked.value;
+  }
 
   async function changeStatus(status: AppointmentStatus) {
+    // Completing with an edited amount saves both together.
+    const amount = status === "COMPLETED" && amountEditable ? amountChange() : undefined;
+    if (amount === null) return;
     setPendingStatus(status);
     setError(null);
     try {
-      const updated = await updateAppointment(appointment.id, { status });
+      const updated = await updateAppointment(appointment.id, {
+        status,
+        ...(amount !== undefined ? { amountCharged: amount } : {}),
+      });
       onSaved(updated, `Marked as ${actionLabel(status).toLowerCase()}.`);
     } catch (cause) {
       setError(toErrorMessage(cause));
@@ -131,7 +158,12 @@ function DetailBody({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{appointment.client?.name ?? "Appointment"}</DialogTitle>
+        <DialogTitle className="flex flex-wrap items-center gap-2">
+          {appointment.client?.name ?? (appointment.source === "WALK_IN" ? "Walk-in" : "Appointment")}
+          <Badge tone={appointment.source === "WALK_IN" ? "warning" : "neutral"}>
+            {appointment.source === "WALK_IN" ? "Walk-in" : "Online"}
+          </Badge>
+        </DialogTitle>
         <DialogDescription>
           {appointment.client?.phone ?? "No phone on file"}
           {appointment.client?.email ? ` · ${appointment.client.email}` : ""}
@@ -152,9 +184,12 @@ function DetailBody({
             <StatusPill status={appointment.status} />
           </Fact>
           <Fact label="Service">
-            {appointment.service?.name ?? "—"}
+            {appointmentServiceNames(appointment)}
             <span className="block font-normal text-slate-600">
               {formatPrice(appointment.price)}
+              {appointment.amountCharged != null && appointment.amountCharged !== appointment.price && (
+                <> · paid {formatPrice(appointment.amountCharged)}</>
+              )}
             </span>
           </Fact>
           <Fact label="Barber">{appointment.barber?.name ?? "—"}</Fact>
@@ -196,6 +231,23 @@ function DetailBody({
           )}
         </div>
 
+        {amountEditable && (
+          <Input
+            label="Amount paid"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            value={amountText}
+            onChange={(e) => {
+              setAmountText(e.target.value);
+              setAmountError(undefined);
+            }}
+            disabled={isBusy}
+            error={amountError}
+            hint="Saved when you complete the visit. Commission is based on this amount."
+          />
+        )}
+
         <div>
           <Textarea
             label="Notes"
@@ -222,13 +274,17 @@ function DetailBody({
       </div>
 
       <DialogFooter className="sm:justify-between">
-        <Button
-          variant="outline"
-          onClick={() => onReschedule(appointment)}
-          disabled={isBusy}
-        >
-          Reschedule…
-        </Button>
+        {appointment.blocksCalendar !== false ? (
+          <Button
+            variant="outline"
+            onClick={() => onReschedule(appointment)}
+            disabled={isBusy}
+          >
+            Reschedule…
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button variant="ghost" onClick={onClose} disabled={isBusy}>
           Close
         </Button>

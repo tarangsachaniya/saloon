@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdmin } from "@/lib/server/auth";
-import { AvailabilityError, computeAvailability } from "@/lib/server/availability";
+import { AvailabilityError, computeAvailability, serviceIdsFromQuery } from "@/lib/server/availability";
 import { handleRouteError } from "@/lib/server/http";
 
 /**
- * GET /api/dashboard/barbers/:id/availability?serviceId=&date=&excludeAppointmentId=
+ * GET /api/dashboard/barbers/:id/availability?serviceIds=&date=&excludeAppointmentId=
  *
  * The reschedule dialog's slot grid. Same engine as the public route, but the
  * salon comes from the signed-in staff member rather than a URL slug, so it
@@ -24,20 +24,20 @@ export async function GET(
 
     const { id } = await params;
     const searchParams = request.nextUrl.searchParams;
-    const serviceId = searchParams.get("serviceId");
+    const serviceIds = serviceIdsFromQuery(searchParams);
     const date = searchParams.get("date");
     const excludeAppointmentId = searchParams.get("excludeAppointmentId");
 
-    if (!serviceId || !date) {
+    if (serviceIds.length === 0 || !date) {
       return NextResponse.json(
-        { success: false, message: "serviceId and date are required." },
+        { success: false, message: "serviceIds and date are required." },
         { status: 400 },
       );
     }
 
     const result = await computeAvailability({
       salonId: auth.salonId,
-      serviceId,
+      serviceIds,
       barberId: id,
       date,
       excludeAppointmentId: excludeAppointmentId || null,

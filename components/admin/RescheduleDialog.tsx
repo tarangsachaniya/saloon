@@ -150,6 +150,12 @@ function RescheduleForm({
   );
 
   const selectedService = services.find((service) => service.id === serviceId);
+  // Keeping the service keeps ALL of the booking's services; picking another
+  // one replaces them with that single service (the server applies the same rule).
+  const bookedIds = appointment.services?.length
+    ? appointment.services.map((item) => item.serviceId)
+    : [appointment.serviceId];
+  const serviceKey = serviceId === appointment.serviceId ? bookedIds.join(",") : serviceId;
 
   const {
     data: availability,
@@ -158,16 +164,16 @@ function RescheduleForm({
     refresh,
   } = useAdminData<AvailabilityResponse | null>(
     (signal) =>
-      serviceId && barberId && date
+      serviceKey && barberId && date
         ? getAdminBarberAvailability(
             barberId,
             // Tell the server we are MOVING this appointment, so it does not
             // count against its own availability.
-            { serviceId, date, excludeAppointmentId: appointment.id },
+            { serviceIds: serviceKey.split(","), date, excludeAppointmentId: appointment.id },
             { signal },
           )
         : Promise.resolve(null),
-    [serviceId, barberId, date, appointment.id],
+    [serviceKey, barberId, date, appointment.id],
   );
 
   /**

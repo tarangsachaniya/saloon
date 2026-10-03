@@ -6,7 +6,7 @@ import { getServices } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
 import { useSalon } from "@/lib/salon/SalonContext";
 import type { Service } from "@/lib/booking/types";
-import { Badge, EmptyState, Loader } from "@/components/ui";
+import { Badge, Button, EmptyState, Loader } from "@/components/ui";
 import { formatPrice } from "@/lib/utils/format";
 import { formatDuration } from "@/lib/utils/time";
 import { getServiceImageUrl } from "@/lib/utils/barberImages";
@@ -14,7 +14,8 @@ import { StepError, StepShell } from "./StepShell";
 import { useAsync } from "./useAsync";
 
 export function ServiceSelector({ onSelected }: { onSelected: () => void }) {
-  const { service: selected, selectService } = useBooking();
+  // Several services can be booked together; one barber does them back-to-back.
+  const { services: chosen, service: total, toggleService } = useBooking();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const { slug } = useSalon();
 
@@ -39,14 +40,13 @@ export function ServiceSelector({ onSelected }: { onSelected: () => void }) {
   }, [data, activeCategory]);
 
   function choose(service: Service) {
-    selectService(service);
-    onSelected();
+    toggleService(service);
   }
 
   return (
     <StepShell
-      title="Choose a service"
-      description="Select from our range of bespoke haircutting, beard grooming, and relaxation services."
+      title="Choose your services"
+      description="Pick one or more — they're done back-to-back in a single appointment."
     >
       {/* Category filter pills */}
       {categories.length > 1 && (
@@ -95,7 +95,7 @@ export function ServiceSelector({ onSelected }: { onSelected: () => void }) {
       {filteredServices.length > 0 && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filteredServices.map((service) => {
-            const isSelected = selected?.id === service.id;
+            const isSelected = chosen.some((s) => s.id === service.id);
             const imgUrl = getServiceImageUrl(service.category, service.name);
 
             return (
@@ -162,13 +162,29 @@ export function ServiceSelector({ onSelected }: { onSelected: () => void }) {
                         isSelected ? "text-secondary-700" : "text-slate-400 group-hover:text-primary"
                       }`}
                     >
-                      {isSelected ? "Selected ✓" : "Select →"}
+                      {isSelected ? "Added ✓" : "Add +"}
                     </span>
                   </div>
                 </div>
               </button>
             );
           })}
+        </div>
+      )}
+
+      {total && (
+        <div
+          role="status"
+          className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-secondary/40 bg-white/95 p-3 shadow-card-hover backdrop-blur sm:p-4"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-extrabold text-primary">
+              {chosen.length} {chosen.length === 1 ? "service" : "services"} ·{" "}
+              {formatDuration(total.durationMinutes)} · {formatPrice(total.price)}
+            </p>
+            <p className="truncate text-xs text-slate-500">{total.name}</p>
+          </div>
+          <Button onClick={onSelected}>Continue</Button>
         </div>
       )}
     </StepShell>

@@ -18,17 +18,18 @@ import type { RequestOptions } from "./client";
 /* ----------------------------- Public (customer) ---------------------------- */
 
 /**
- * `GET /api/s/:slug/barbers?serviceId=` — a salon's barbers who can perform the
- * given service (active only). Omit `serviceId` for the full active roster.
+ * `GET /api/s/:slug/barbers?serviceIds=` — a salon's barbers who can perform
+ * EVERY given service (active only). Omit it for the full active roster.
  */
 export async function getBarbers(
   salonSlug: string,
-  serviceId?: string,
+  serviceIds?: string | string[],
   options?: RequestOptions,
 ): Promise<Barber[]> {
+  const ids = typeof serviceIds === "string" ? [serviceIds] : serviceIds;
   const data = await get<{ success: true; barbers: Barber[] }>(
     `/s/${encodeURIComponent(salonSlug)}/barbers`,
-    { auth: false, ...options, query: { serviceId, ...options?.query } },
+    { auth: false, ...options, query: { serviceIds: ids?.length ? ids.join(",") : undefined, ...options?.query } },
   );
   return data.barbers.map(normalizeBarber);
 }
@@ -47,7 +48,7 @@ export async function getBarber(
 }
 
 /**
- * `GET /api/dashboard/barbers/:id/availability?serviceId=&date=&excludeAppointmentId=`
+ * `GET /api/dashboard/barbers/:id/availability?serviceIds=&date=&excludeAppointmentId=`
  * — a single barber's slots for the signed-in staff's salon (reschedule dialog).
  *
  * `excludeAppointmentId` leaves one existing appointment out of the overlap
@@ -59,13 +60,13 @@ export async function getBarber(
  */
 export async function getAdminBarberAvailability(
   id: string,
-  params: { serviceId: string; date: string; excludeAppointmentId?: string },
+  params: { serviceIds: string[]; date: string; excludeAppointmentId?: string },
   options?: RequestOptions,
 ): Promise<AvailabilityResponse> {
   return get<AvailabilityResponse>(`/dashboard/barbers/${encodeURIComponent(id)}/availability`, {
     ...options,
     query: {
-      serviceId: params.serviceId,
+      serviceIds: params.serviceIds.join(","),
       date: params.date,
       excludeAppointmentId: params.excludeAppointmentId,
       ...options?.query,

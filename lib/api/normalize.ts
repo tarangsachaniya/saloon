@@ -61,7 +61,14 @@ export function normalizeAppointment(appointment: Appointment): Appointment {
     ...appointment,
     appointmentDate: toDateOnly(appointment.appointmentDate),
     price: toNumber(appointment.price),
+    amountCharged:
+      appointment.amountCharged === null || appointment.amountCharged === undefined
+        ? appointment.amountCharged
+        : toNumber(appointment.amountCharged),
   };
+  if (appointment.services) {
+    normalized.services = appointment.services.map((item) => ({ ...item, price: toNumber(item.price) }));
+  }
   if (appointment.service) {
     normalized.service = normalizeService(appointment.service);
   }

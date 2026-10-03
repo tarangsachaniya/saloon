@@ -66,7 +66,7 @@ export const timeStringSchema = z
  * a half-built wizard state can never reach the API.
  */
 export const createAppointmentSchema = z.object({
-  serviceId: z.string().min(1, "Please choose a service."),
+  serviceIds: z.array(z.string().min(1)).min(1, "Please choose a service.").max(10, "Choose at most 10 services."),
   barberId: z.string().min(1, "Please choose a barber."),
   date: dateStringSchema,
   startTime: timeStringSchema,

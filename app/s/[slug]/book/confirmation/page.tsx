@@ -21,6 +21,7 @@ import {
   minutesToTimeString,
 } from "@/lib/utils/time";
 import { BarberAvatar } from "@/components/booking/BarberSelector";
+import { appointmentServiceNames } from "@/lib/booking/serviceNames";
 
 export default function ConfirmationPage() {
   const router = useRouter();
@@ -54,7 +55,7 @@ export default function ConfirmationPage() {
   }
 
   const appointment = confirmedAppointment;
-  const serviceName = appointment.service?.name ?? service?.name ?? "—";
+  const serviceName = appointment.services?.length || appointment.service ? appointmentServiceNames(appointment) : (service?.name ?? "—");
   const barberName =
     appointment.barber?.name ?? (isAnyBarber ? undefined : barber?.name) ?? "—";
 

@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { AvailabilityError, computeAvailability } from "@/lib/server/availability";
+import { AvailabilityError, computeAvailability, serviceIdsFromQuery } from "@/lib/server/availability";
 import { handleRouteError } from "@/lib/server/http";
 import { resolveSalon } from "@/lib/server/salon";
 
 
 /**
- * GET /api/barbers/:id/availability?serviceId=&date=&excludeAppointmentId=
+ * GET /api/barbers/:id/availability?serviceIds=&date=&excludeAppointmentId=
  *
  * Port of `barberController.getBarberAvailability`, plus the fix M6 asked for.
  *
@@ -31,23 +31,25 @@ export async function GET(
     if ("error" in gate) return gate.error;
     const salon = gate.salon;
     const searchParams = request.nextUrl.searchParams;
-    const serviceId = searchParams.get("serviceId");
+    const serviceIds = serviceIdsFromQuery(searchParams);
     const date = searchParams.get("date");
     const excludeAppointmentId = searchParams.get("excludeAppointmentId");
 
-    if (!serviceId || !date) {
+    if (serviceIds.length === 0 || !date) {
       return NextResponse.json(
-        { success: false, message: "serviceId and date are required." },
+        { success: false, message: "serviceIds and date are required." },
         { status: 400 },
       );
     }
 
     const result = await computeAvailability({
       salonId: salon.id,
-      serviceId,
+      serviceIds,
       barberId: id,
       date,
       excludeAppointmentId: excludeAppointmentId || null,
+      // A new online booking needs the worker open for pre-booking.
+      onlineBooking: !excludeAppointmentId,
     });
     return NextResponse.json({ success: true, ...result }, { status: 200 });
   } catch (error) {

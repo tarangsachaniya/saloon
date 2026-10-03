@@ -233,6 +233,7 @@ function BarberForm({
     (barber?.specializations ?? []).join(", "),
   );
   const [isActive, setIsActive] = useState(barber?.isActive ?? true);
+  const [onlineBookingEnabled, setOnlineBookingEnabled] = useState(barber?.onlineBookingEnabled ?? true);
 
   const [serviceIds, setServiceIds] = useState<string[]>(
     () => (barber?.services ?? []).map((service) => service.id),
@@ -436,6 +437,7 @@ function BarberForm({
         .map((value) => value.trim())
         .filter(Boolean),
       isActive,
+      onlineBookingEnabled,
       serviceIds,
       // All seven rows every time: the backend replaces the set wholesale, so
       // an omitted weekday is a deleted weekday.
@@ -595,6 +597,18 @@ function BarberForm({
                 isActive
                   ? "Shown in the booking wizard."
                   : "Hidden from customers. Existing appointments are unaffected."
+              }
+              block
+            />
+
+            <Toggle
+              checked={onlineBookingEnabled}
+              onCheckedChange={setOnlineBookingEnabled}
+              label="Online pre-booking"
+              description={
+                onlineBookingEnabled
+                  ? "Customers can pre-book this worker on the app and website."
+                  : "Walk-ins only: not offered for online booking. Existing bookings are unaffected."
               }
               block
             />

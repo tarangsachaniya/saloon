@@ -40,7 +40,7 @@ import {
  * first incomplete step instead of rendering a broken screen.
  */
 export default function BookPage() {
-  const { completedSteps, canGoToStep, selectService, selectBarber } = useBooking();
+  const { completedSteps, canGoToStep, selectServices, selectBarber } = useBooking();
   const { slug } = useSalon();
   const [step, setStep] = useState<BookingStep>("service");
   // "Book again" arrives as ?serviceId=&barberId=. Both are re-fetched from the
@@ -72,21 +72,23 @@ export default function BookPage() {
     if (prefillStarted.current) return;
     prefillStarted.current = true;
     const params = new URLSearchParams(window.location.search);
-    const serviceId = params.get("serviceId");
+    // `serviceIds=a,b` (multi-service) or the older single `serviceId=`.
+    const wanted = (params.get("serviceIds") ?? params.get("serviceId") ?? "").split(",").filter(Boolean);
     const barberId = params.get("barberId");
-    if (!serviceId) return;
+    if (wanted.length === 0) return;
     setPreparing(true);
 
     (async () => {
       try {
-        const service = (await getServices(slug)).find((s) => s.id === serviceId);
-        if (!service) {
-          setNotice("That service isn't available any more. Please choose another.");
+        const all = await getServices(slug);
+        const services = wanted.map((id) => all.find((s) => s.id === id));
+        if (services.some((s) => !s)) {
+          setNotice("A service from that booking isn't available any more. Please choose again.");
           return;
         }
-        selectService(service);
+        selectServices(services as typeof all);
         const barber = barberId
-          ? (await getBarbers(slug, service.id)).find((b) => b.id === barberId)
+          ? (await getBarbers(slug, wanted)).find((b) => b.id === barberId)
           : undefined;
         if (barber) {
           selectBarber(barber);
@@ -101,7 +103,7 @@ export default function BookPage() {
         setPreparing(false);
       }
     })();
-  }, [slug, selectService, selectBarber]);
+  }, [slug, selectServices, selectBarber]);
 
   const navigate = useCallback((target: BookingStep) => setStep(target), []);
 

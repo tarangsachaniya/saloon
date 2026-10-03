@@ -103,6 +103,9 @@ function RescheduleBody({
     [settings],
   );
 
+  // The whole booking moves: every service, back-to-back.
+  const serviceKey = (appointment.services?.map((s) => s.id) ?? [appointment.service.id]).join(",");
+
   // Availability for the chosen date only; a superseded request is aborted, so a
   // slow reply for an earlier date can never overwrite the current one.
   useEffect(() => {
@@ -113,7 +116,7 @@ function RescheduleBody({
     setAvailability(null);
     getAvailability(
       slug,
-      { serviceId: appointment.service.id, barberId: appointment.barber.id, date, excludeAppointmentId: appointment.id },
+      { serviceIds: serviceKey.split(","), barberId: appointment.barber.id, date, excludeAppointmentId: appointment.id },
       { signal: controller.signal },
     )
       .then((a) => {
@@ -126,7 +129,7 @@ function RescheduleBody({
         setSlotsLoading(false);
       });
     return () => controller.abort();
-  }, [slug, appointment.id, appointment.service.id, appointment.barber.id, date, retry]);
+  }, [slug, appointment.id, serviceKey, appointment.barber.id, date, retry]);
 
   function go(next: Step) {
     setStep(next);

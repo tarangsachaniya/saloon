@@ -4,13 +4,15 @@ import prisma from "@/lib/server/prisma";
 import { getOptionalStaff } from "@/lib/server/auth";
 import { resolveSalon } from "@/lib/server/salon";
 import { handleRouteError } from "@/lib/server/http";
+import { serviceIdsFromQuery } from "@/lib/server/availability";
 
 /**
  * GET /api/barbers — customer-facing list. Port of `barberController.listBarbers`
  * behind the `optional` (soft) gate.
  *
- * `?serviceId=` filters to barbers actually qualified for that service, which
- * is what makes an unqualified barber disappear from the booking wizard.
+ * `?serviceIds=a,b` (or legacy `?serviceId=`) filters to barbers qualified for
+ * EVERY listed service, which is what makes an unqualified barber disappear
+ * from the booking wizard.
  * `?includeInactive=true` is honoured only for this salon's signed-in staff.
  */
 
@@ -26,7 +28,7 @@ export async function GET(
     const salon = gate.salon;
 
     const user = await getOptionalStaff(request, salon.id);
-    const serviceId = request.nextUrl.searchParams.get("serviceId");
+    const serviceIds = serviceIdsFromQuery(request.nextUrl.searchParams);
     const includeInactive =
       Boolean(user) &&
       String(request.nextUrl.searchParams.get("includeInactive")) === "true";
@@ -34,8 +36,9 @@ export async function GET(
     const barbers = await prisma.barber.findMany({
       where: {
         salonId: salon.id,
-        ...(includeInactive ? {} : { isActive: true }),
-        ...(serviceId ? { services: { some: { id: serviceId } } } : {}),
+        // The public list is what customers pre-book from: walk-in-only workers are hidden.
+        ...(includeInactive ? {} : { isActive: true, onlineBookingEnabled: true }),
+        ...(serviceIds.length ? { AND: serviceIds.map((id) => ({ services: { some: { id } } })) } : {}),
       },
       orderBy: { id: "asc" },
       include: {

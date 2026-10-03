@@ -38,17 +38,17 @@ export function BarberAvatar({
 }
 
 export function BarberSelector({ onSelected }: { onSelected: () => void }) {
-  const { service, barber: selected, isAnyBarber, selectBarber, selectAnyBarber } =
+  const { service, serviceIds, barber: selected, isAnyBarber, selectBarber, selectAnyBarber } =
     useBooking();
   const { slug } = useSalon();
-  const serviceId = service?.id ?? null;
+  const serviceKey = serviceIds.join(",");
 
   const { data, error, isLoading, reload } = useAsync(
     (signal) =>
-      serviceId
-        ? getBarbers(slug, serviceId, { signal })
+      serviceKey
+        ? getBarbers(slug, serviceKey.split(","), { signal })
         : Promise.resolve<Barber[]>([]),
-    [slug, serviceId],
+    [slug, serviceKey],
   );
 
   function chooseAny() {

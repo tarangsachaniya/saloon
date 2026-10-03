@@ -14,6 +14,8 @@ import "server-only";
 // and `date` is always a plain `"YYYY-MM-DD"` calendar string - never a moment
 // in a timezone. Only the outermost serializer turns minutes into "HH:MM".
 
+import { Prisma } from "@prisma/client";
+
 import prisma from "./prisma";
 
 // ---------------------------------------------------------------------------
@@ -403,20 +405,72 @@ export class AvailabilityError extends Error {
   }
 }
 
+/** De-duplicated, order-preserving list of non-empty ids. */
+export function uniqueIds(ids: readonly unknown[]): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    if (typeof id === "string" && id && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/**
+ * `?serviceIds=a,b` (multi-service) or the legacy `?serviceId=a` (older app
+ * builds). Empty when neither is present.
+ */
+export function serviceIdsFromQuery(searchParams: URLSearchParams): string[] {
+  const list = searchParams.get("serviceIds");
+  if (list) return uniqueIds(list.split(",").map((s) => s.trim())).slice(0, MAX_SERVICES_PER_BOOKING);
+  const single = searchParams.get("serviceId");
+  return single ? [single] : [];
+}
+
+/** Upper bound on services in one booking (keeps a single slot sane). */
+export const MAX_SERVICES_PER_BOOKING = 10;
+
+/** The salon's services for `ids`, in the order given. Any missing id is a 404. */
+export async function loadServices(salonId: string, ids: string[], activeOnly: boolean) {
+  const rows = await prisma.service.findMany({
+    where: { id: { in: ids }, salonId, ...(activeOnly ? { isActive: true } : {}) },
+  });
+  const ordered = ids.map((id) => rows.find((r) => r.id === id));
+  if (ordered.some((r) => !r)) throw new AvailabilityError("Service not found.", 404);
+  return ordered as typeof rows;
+}
+
+/**
+ * Several services done back-to-back, seen as one: the first service's id and
+ * the summed duration and price. Every caller that only needs "how long / how
+ * much" keeps working unchanged.
+ */
+export function bundleServices<
+  T extends { id: string; name: string; durationMinutes: number; price: Prisma.Decimal },
+>(services: T[]) {
+  const [first] = services;
+  return {
+    ...first,
+    name: services.map((s) => s.name).join(" + "),
+    durationMinutes: services.reduce((sum, s) => sum + s.durationMinutes, 0),
+    price: services.reduce((sum, s) => sum.add(s.price), new Prisma.Decimal(0)),
+  };
+}
+
 /**
  * Loads everything the pure functions need for a date + service + barber(s).
  * `excludeAppointmentId` lets a reschedule ignore the row being moved.
  */
 export async function loadContext({
   salonId,
-  serviceId,
+  serviceIds,
   barberId = "any",
   date,
   excludeAppointmentId = null,
   bookableOnly = false,
+  onlineBooking = false,
 }: {
   salonId: string;
-  serviceId: string;
+  /** One or more services, performed back-to-back by ONE barber, in this order. */
+  serviceIds: string[];
   barberId?: string;
   date: string;
   excludeAppointmentId?: string | null;
@@ -426,32 +480,42 @@ export async function loadContext({
    * this off so an existing appointment can still be moved.
    */
   bookableOnly?: boolean;
+  /**
+   * A NEW customer booking: only workers with online pre-booking switched on.
+   * (A customer moving an existing booking does not need it.)
+   */
+  onlineBooking?: boolean;
 }) {
   const weekday = weekdayOf(date);
   const dayDate = parseDateOnly(date);
 
-  const [salonSettings, openingHour, service] = await Promise.all([
+  const ids = uniqueIds(serviceIds);
+  if (ids.length === 0) throw new AvailabilityError("At least one service is required.", 400);
+
+  const [salonSettings, openingHour, services] = await Promise.all([
     prisma.salonSettings.findUnique({ where: { salonId } }),
     prisma.salonOpeningHour.findUnique({ where: { salonId_weekday: { salonId, weekday } } }),
-    prisma.service.findFirst({
-      where: { id: serviceId, salonId, ...(bookableOnly ? { isActive: true } : {}) },
-    }),
+    loadServices(salonId, ids, bookableOnly),
   ]);
 
   if (!salonSettings) throw new AvailabilityError("Salon settings have not been configured.", 500);
-  if (!service) throw new AvailabilityError("Service not found.", 404);
+  const service = bundleServices(services);
 
+  // The one barber must perform EVERY chosen service.
+  const offersAll = { AND: ids.map((id) => ({ services: { some: { id } } })) };
+  const online = onlineBooking ? { onlineBookingEnabled: true } : {};
   const wantsAny = !barberId || barberId === "any";
   const barbers = wantsAny
     ? await prisma.barber.findMany({
-        where: { salonId, isActive: true, services: { some: { id: serviceId } } },
+        where: { salonId, isActive: true, ...offersAll, ...online },
         orderBy: { id: "asc" },
       })
     : await prisma.barber.findMany({
         where: {
           id: barberId,
           salonId,
-          ...(bookableOnly ? { isActive: true, services: { some: { id: serviceId } } } : {}),
+          ...(bookableOnly ? { isActive: true, ...offersAll } : {}),
+          ...online,
         },
         orderBy: { id: "asc" },
       });
@@ -481,6 +545,8 @@ export async function loadContext({
             barberId: { in: barberIds },
             appointmentDate: dayDate,
             status: { notIn: ["CANCELLED", "NO_SHOW"] },
+            // Quick sales are records, not calendar bookings.
+            blocksCalendar: true,
             ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
           },
         })
@@ -495,7 +561,7 @@ export async function loadContext({
     existingAppointments: appointments.filter((a) => a.barberId === barber.id),
   }));
 
-  return { salonSettings, openingHour, service, wantsAny, barbers: byBarber };
+  return { salonSettings, openingHour, service, services, wantsAny, barbers: byBarber };
 }
 
 /**
@@ -504,22 +570,28 @@ export async function loadContext({
  */
 export async function computeAvailabilityDetailed({
   salonId,
-  serviceId,
+  serviceIds,
   barberId = "any",
   date,
   now = salonNow(),
   excludeAppointmentId = null,
   bookableOnly = false,
+  staffBooking = false,
+  onlineBooking = false,
 }: {
   salonId: string;
-  serviceId: string;
+  serviceIds: string[];
   barberId?: string;
   date: string;
   now?: Date;
   excludeAppointmentId?: string | null;
   bookableOnly?: boolean;
+  /** Staff booking a walk-in: the customer minimum-advance notice does not apply. */
+  staffBooking?: boolean;
+  /** New customer booking: only workers open for online pre-booking. */
+  onlineBooking?: boolean;
 }) {
-  const ctx = await loadContext({ salonId, serviceId, barberId, date, excludeAppointmentId, bookableOnly });
+  const ctx = await loadContext({ salonId, serviceIds, barberId, date, excludeAppointmentId, bookableOnly, onlineBooking });
   const { salonSettings, openingHour, service } = ctx;
 
   const check = validateBookingDate({ date, salonSettings, now });
@@ -535,7 +607,7 @@ export async function computeAvailabilityDetailed({
       existingAppointments: entry.existingAppointments,
       service,
       slotIntervalMinutes: salonSettings.slotIntervalMinutes,
-      minimumAdvanceBookingMinutes: salonSettings.minimumAdvanceBookingMinutes,
+      minimumAdvanceBookingMinutes: staffBooking ? 0 : salonSettings.minimumAdvanceBookingMinutes,
       date,
       now,
       isDayOff: entry.isDayOff,
@@ -552,14 +624,16 @@ export async function computeAvailabilityDetailed({
     // internal-only extras, stripped by computeAvailability()
     _perBarber: perBarber,
     _service: service,
+    _services: ctx.services,
     _salonSettings: salonSettings,
   };
 }
 
 /** Public-facing availability payload. */
 export async function computeAvailability(opts: {
+  onlineBooking?: boolean;
   salonId: string;
-  serviceId: string;
+  serviceIds: string[];
   barberId?: string;
   date: string;
   now?: Date;
@@ -579,7 +653,9 @@ export type ResolveBookingResult =
   | {
       ok: true;
       barberId: string;
+      /** The bundle: totals over all services, `id` of the first. */
       service: Awaited<ReturnType<typeof loadContext>>["service"];
+      services: Awaited<ReturnType<typeof loadContext>>["services"];
       salonSettings: Awaited<ReturnType<typeof loadContext>>["salonSettings"];
       startTime: number;
       endTime: number;
@@ -599,22 +675,26 @@ export type ResolveBookingResult =
  */
 export async function resolveBooking({
   salonId,
-  serviceId,
+  serviceIds,
   barberId = "any",
   date,
   startTime,
   now = salonNow(),
   excludeAppointmentId = null,
   bookableOnly = false,
+  staffBooking = false,
+  onlineBooking = false,
 }: {
   salonId: string;
-  serviceId: string;
+  serviceIds: string[];
   barberId?: string;
   date: string;
   startTime: unknown;
   now?: Date;
   excludeAppointmentId?: string | null;
   bookableOnly?: boolean;
+  staffBooking?: boolean;
+  onlineBooking?: boolean;
 }): Promise<ResolveBookingResult> {
   const requestedStart = hhmmToMinutes(startTime);
   if (requestedStart === null) {
@@ -625,12 +705,14 @@ export async function resolveBooking({
   try {
     detailed = await computeAvailabilityDetailed({
       salonId,
-      serviceId,
+      serviceIds,
       barberId,
       date,
       now,
       excludeAppointmentId,
       bookableOnly,
+      staffBooking,
+      onlineBooking,
     });
   } catch (err) {
     if (err instanceof AvailabilityError) {
@@ -658,6 +740,7 @@ export async function resolveBooking({
     ok: true,
     barberId: free.barberId,
     service,
+    services: detailed._services,
     salonSettings: detailed._salonSettings,
     startTime: requestedStart,
     endTime: requestedStart + service.durationMinutes,
@@ -667,17 +750,17 @@ export async function resolveBooking({
 /** Thin alias kept for readability at the call site. */
 export async function resolveAnyBarber({
   salonId,
-  serviceId,
+  serviceIds,
   date,
   startTime,
   now = salonNow(),
 }: {
   salonId: string;
-  serviceId: string;
+  serviceIds: string[];
   date: string;
   startTime: unknown;
   now?: Date;
 }): Promise<string | null> {
-  const result = await resolveBooking({ salonId, serviceId, barberId: "any", date, startTime, now });
+  const result = await resolveBooking({ salonId, serviceIds, barberId: "any", date, startTime, now });
   return result.ok ? result.barberId : null;
 }

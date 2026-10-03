@@ -70,6 +70,8 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
   const { slug } = useSalon();
   const {
     service,
+    services,
+    serviceIds,
     barber,
     isAnyBarber,
     barberSelection,
@@ -110,7 +112,7 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
     }
 
     const payload: CreateAppointmentPayload = {
-      serviceId: service.id,
+      serviceIds,
       barberId: barberSelection,
       date,
       startTime: slot.start,
@@ -183,8 +185,20 @@ export function ConfirmationSummary({ onNavigate }: ConfirmationSummaryProps) {
           </h3>
           <dl className="mt-2">
             <SummaryRow
-              label="Service"
-              value={service.name}
+              label={services.length > 1 ? `Services (${services.length})` : "Service"}
+              value={
+                services.length > 1 ? (
+                  <span className="flex flex-col gap-0.5">
+                    {services.map((s) => (
+                      <span key={s.id}>
+                        {s.name} · {formatPrice(s.price)}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  service.name
+                )
+              }
               onChange={() => onNavigate("service")}
             />
             <SummaryRow

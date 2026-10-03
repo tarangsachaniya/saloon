@@ -8,6 +8,8 @@ import { hhmmToMinutes, parseDateOnly, resolveBooking, salonNow } from "@/lib/se
 import { LIVE_STATUSES, changeDecision } from "@/lib/server/appointmentPolicy";
 import {
   MY_APPOINTMENT_INCLUDE,
+  bookedServiceIds,
+  servicesActive,
   UNAVAILABLE_FOR_RESCHEDULE,
   serializeMyAppointment,
 } from "@/lib/server/customerAppointments";
@@ -55,7 +57,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!decision.allowed) {
       return NextResponse.json({ success: false, message: decision.reason }, { status: 409 });
     }
-    if (!appointment.salon.isActive || !appointment.service.isActive || !appointment.barber.isActive) {
+    if (!appointment.salon.isActive || !servicesActive(appointment) || !appointment.barber.isActive) {
       return NextResponse.json({ success: false, message: UNAVAILABLE_FOR_RESCHEDULE }, { status: 409 });
     }
 
@@ -67,10 +69,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    // Same rules as a new booking, for THIS barber and service.
+    // Same rules as a new booking, for THIS barber and these services.
     const resolved = await resolveBooking({
       salonId: appointment.salonId,
-      serviceId: appointment.serviceId,
+      serviceIds: bookedServiceIds(appointment),
       barberId: appointment.barberId,
       date,
       startTime,
@@ -80,8 +82,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!resolved.ok) {
       return NextResponse.json({ success: false, message: resolved.message }, { status: resolved.status });
     }
-    // The appointment keeps the duration it was booked with; if the service has
-    // since been edited the two would disagree, so don't guess.
+    // The appointment keeps the (total) duration it was booked with; if a service
+    // has since been edited the two would disagree, so don't guess.
     if (resolved.service.durationMinutes !== appointment.durationMinutes) {
       return NextResponse.json(
         { success: false, message: "This service has changed since you booked. Please cancel and book again." },

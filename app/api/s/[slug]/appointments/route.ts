@@ -4,13 +4,16 @@ import prisma from "@/lib/server/prisma";
 import * as availability from "@/lib/server/availability";
 import { isExclusionViolation, SLOT_TAKEN_MESSAGE } from "@/lib/server/dbErrors";
 import { upsertClientByPhone } from "@/lib/server/clients";
-import { APPOINTMENT_INCLUDE } from "@/lib/server/appointments";
+import { APPOINTMENT_INCLUDE, serviceItemsCreate } from "@/lib/server/appointments";
 import { sendAppointmentBookedMail } from "@/lib/server/mail";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
 import { resolveSalon } from "@/lib/server/salon";
 import { getOptionalCustomer } from "@/lib/server/auth";
 import { CONSENT_VERSION } from "@/lib/legal/versions";
-import { createAppointmentBodySchema } from "@/lib/server/validation/appointmentValidation";
+import {
+  createAppointmentBodySchema,
+  requestedServiceIds,
+} from "@/lib/server/validation/appointmentValidation";
 
 /**
  * POST /api/s/[slug]/appointments — the public customer booking endpoint.
@@ -47,7 +50,8 @@ export async function POST(
     }
 
     const parsed = await parseJsonBody<{
-      serviceId: string;
+      serviceIds?: string[];
+      serviceId?: string;
       barberId?: string;
       date: string;
       startTime: string;
@@ -60,8 +64,8 @@ export async function POST(
     }>(request, createAppointmentBodySchema);
     if ("error" in parsed) return parsed.error;
 
+    const serviceIds = requestedServiceIds(parsed.body);
     const {
-      serviceId,
       barberId = "any",
       date,
       startTime,
@@ -75,11 +79,12 @@ export async function POST(
     // (a)+(b) Re-derive the grid and resolve "any" server-side.
     const resolved = await availability.resolveBooking({
       salonId: salon.id,
-      serviceId,
+      serviceIds,
       barberId,
       date,
       startTime,
       bookableOnly: true,
+      onlineBooking: true,
     });
     if (!resolved.ok) {
       return NextResponse.json(
@@ -105,13 +110,16 @@ export async function POST(
           clientId: client.id,
           userId: customer.id,
           barberId: resolved.barberId,
+          // First service + totals; every service is in `services`.
           serviceId: resolved.service.id,
+          services: serviceItemsCreate(resolved.services),
           appointmentDate: availability.parseDateOnly(date),
           startTime: resolved.startTime,
           endTime: resolved.endTime,
           durationMinutes: resolved.service.durationMinutes,
           price: resolved.service.price,
           status: "CONFIRMED",
+          source: "ONLINE",
           notes: notes || null,
           consentAt: new Date(),
           consentVersion: CONSENT_VERSION,

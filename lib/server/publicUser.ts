@@ -15,6 +15,8 @@ export function publicUser(user: User, salon?: { slug: string; name: string } | 
     email: user.email,
     role: user.role,
     salonId: user.salonId,
+    /** STAFF with their own login: the worker they are. */
+    barberId: user.barberId,
     salonSlug: salon?.slug ?? null,
     salonName: salon?.name ?? null,
   };

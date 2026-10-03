@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 
+import { formatCommissionRate } from "@/components/admin/CommissionDialog";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { MyEarningsView } from "@/components/admin/MyEarningsView";
 import { RefreshIcon } from "@/components/admin/icons";
 import { LoadError, PageHeader } from "@/components/admin/PageHeader";
 import { ToastViewport, useToasts } from "@/components/admin/Toast";
@@ -12,6 +14,7 @@ import {
   getEarningsSummary,
   markCommissionPaid,
   type CommissionRecord,
+  type CommissionSource,
   type DateRange,
   type WorkerEarnings,
 } from "@/lib/api/commissions";
@@ -24,9 +27,18 @@ import { formatDateLong, toDateString } from "@/lib/utils/time";
 
 /**
  * Worker earnings (owner only). Totals and history come from the stored
- * commission rows, so a worker's percentage changing today never rewrites what
- * was earned yesterday. Cards, not a wide table, so it holds on a phone.
+ * commission rows, so a worker's rate changing today never rewrites what was
+ * earned yesterday. Online bookings and walk-ins both earn commission.
+ * Cards, not a wide table, so it holds on a phone.
  */
+
+const SOURCE_LABEL: Record<CommissionSource, string> = { ONLINE: "Online", WALK_IN: "Walk-in" };
+
+const SOURCE_FILTERS: { id: CommissionSource | "all"; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "ONLINE", label: "Online" },
+  { id: "WALK_IN", label: "Walk-in" },
+];
 
 type Preset = "all" | "today" | "week" | "month" | "custom";
 
@@ -78,6 +90,7 @@ export default function EarningsPage() {
   const [payTarget, setPayTarget] = useState<CommissionRecord | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [source, setSource] = useState<CommissionSource | "all">("all");
 
   const range = useMemo(() => presetRange(preset, custom), [preset, custom]);
   const rangeInvalid = !!(range.from && range.to && range.from > range.to);
@@ -90,9 +103,12 @@ export default function EarningsPage() {
   const history = useAdminData(
     (signal) =>
       selectedId && isOwner && !rangeInvalid
-        ? getCommissionHistory({ barberId: selectedId, ...range }, { signal })
+        ? getCommissionHistory(
+            { barberId: selectedId, ...range, source: source === "all" ? undefined : source },
+            { signal },
+          )
         : Promise.resolve([] as CommissionRecord[]),
-    [selectedId, isOwner, range.from, range.to, rangeInvalid],
+    [selectedId, isOwner, range.from, range.to, rangeInvalid, source],
   );
 
   const workers = summary.data ?? [];
@@ -119,6 +135,7 @@ export default function EarningsPage() {
     }
   }
 
+  if (user && !isOwner && user.barberId) return <MyEarningsView />;
   if (user && !isOwner) {
     return (
       <>
@@ -132,7 +149,7 @@ export default function EarningsPage() {
     <>
       <PageHeader
         title="Worker earnings"
-        description="What each worker has earned from completed appointments."
+        description="What each worker has earned from completed online bookings and walk-ins."
         actions={
           <Button variant="outline" onClick={refreshAll} isLoading={summary.isRefreshing} leftIcon={<RefreshIcon className="h-4 w-4" />}>
             Refresh
@@ -188,7 +205,9 @@ export default function EarningsPage() {
                 </div>
                 <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
                   <Stat label="Completed services" value={String(w.completedServices)} />
-                  <Stat label="Commission rate" value={`${w.commissionPercentage}%`} />
+                  <Stat label="Commission rate" value={formatCommissionRate(w)} />
+                  <Stat label="Online" value={String(w.onlineCount)} />
+                  <Stat label="Walk-in" value={String(w.walkInCount)} />
                   <Stat label="Service amount" value={formatPrice(w.totalServiceAmount)} />
                   <Stat label="Total commission" value={formatPrice(w.totalCommission)} />
                   <Stat label="Pending" value={formatPrice(w.pendingCommission)} tone={w.pendingCommission > 0 ? "warn" : undefined} />
@@ -208,6 +227,22 @@ export default function EarningsPage() {
       {selected && (
         <section aria-label={`Commission history for ${selected.name}`} className="mt-6">
           <h2 className="mb-3 text-lg font-extrabold">Commission history · {selected.name}</h2>
+          <div role="group" aria-label="Booking source" className="mb-3 flex flex-wrap gap-2">
+            {SOURCE_FILTERS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                aria-pressed={source === f.id}
+                onClick={() => setSource(f.id)}
+                className={cn(
+                  "min-h-9 rounded-full px-3.5 py-1.5 text-sm font-semibold ring-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary",
+                  source === f.id ? "bg-primary text-primary-foreground ring-primary" : "bg-surface text-primary ring-slate-200 hover:bg-slate-50",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           {history.isLoading && <Loader label="Loading commission history…" />}
           {history.error && !history.data && <LoadError message={history.error} onRetry={history.refresh} />}
           {history.data && history.data.length === 0 && (
@@ -223,11 +258,20 @@ export default function EarningsPage() {
                   <Card className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl p-4">
                     <div className="min-w-[8rem] flex-1">
                       <p className="truncate text-sm font-bold text-primary">{c.serviceName}</p>
-                      <p className="text-xs text-slate-500">{formatDateLong(c.date)}</p>
+                      <p className="text-xs text-slate-500">
+                        {formatDateLong(c.date)} · {SOURCE_LABEL[c.source]}
+                      </p>
                     </div>
                     <dl className="flex flex-wrap gap-x-6 gap-y-1">
                       <Stat label="Amount" value={formatPrice(c.serviceAmount)} />
-                      <Stat label="Rate" value={`${c.commissionPercentage}%`} />
+                      <Stat
+                        label="Rate"
+                        value={
+                          c.commissionType === "FLAT"
+                            ? `${formatPrice(c.flatAmount)} × ${c.serviceCount}`
+                            : `${c.commissionPercentage}%`
+                        }
+                      />
                       <Stat label="Commission" value={formatPrice(c.commissionAmount)} />
                     </dl>
                     <div className="flex items-center gap-2">

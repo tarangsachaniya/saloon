@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { RefreshIcon } from "@/components/admin/icons";
 import { LoadError, PageHeader } from "@/components/admin/PageHeader";
 import { RescheduleDialog } from "@/components/admin/RescheduleDialog";
+import { WalkInDialog } from "@/components/admin/WalkInDialog";
 import { ToastViewport, useToasts } from "@/components/admin/Toast";
 import {
   APPOINTMENT_STATUS_META,
@@ -25,6 +26,7 @@ import {
   updateAppointmentStatus,
 } from "@/lib/api";
 import { actionLabel } from "@/lib/admin/transitions";
+import { useAuth } from "@/lib/auth/useAuth";
 import { toErrorMessage, useAdminData } from "@/lib/admin/useAdminData";
 import {
   APPOINTMENT_STATUSES,
@@ -59,6 +61,7 @@ const ALL = "all";
 
 export default function AppointmentsPage() {
   const { toasts, push, dismiss } = useToasts();
+  const { user } = useAuth();
 
   const today = useMemo(() => startOfToday(), []);
   const [date, setDate] = useState(() => toDateString(today));
@@ -73,6 +76,7 @@ export default function AppointmentsPage() {
     status: AppointmentStatus;
   } | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [walkInOpen, setWalkInOpen] = useState(false);
 
   /*
    * Reference data (roster, catalogue, booking rules) in ONE load rather than
@@ -219,14 +223,19 @@ export default function AppointmentsPage() {
           </>
         }
         actions={
-          <Button
-            variant="outline"
-            onClick={refresh}
-            isLoading={isRefreshing}
-            leftIcon={<RefreshIcon className="h-4 w-4" />}
-          >
-            Refresh
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => setWalkInOpen(true)} disabled={!reference.data}>
+              Record walk-in
+            </Button>
+            <Button
+              variant="outline"
+              onClick={refresh}
+              isLoading={isRefreshing}
+              leftIcon={<RefreshIcon className="h-4 w-4" />}
+            >
+              Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -392,6 +401,26 @@ export default function AppointmentsPage() {
           // Follow the appointment to its new day, otherwise it just vanishes
           // from the filtered list and reads as data loss.
           if (updated.appointmentDate !== date) setDate(updated.appointmentDate);
+          else refresh();
+        }}
+      />
+
+      <WalkInDialog
+        open={walkInOpen}
+        onOpenChange={setWalkInOpen}
+        barbers={reference.data?.barbers ?? []}
+        services={reference.data?.services ?? []}
+        maxAdvanceDays={reference.data?.settings.maximumAdvanceBookingDays ?? 30}
+        lockedBarberId={user?.barberId}
+        onSaved={(created) => {
+          setWalkInOpen(false);
+          push(
+            "success",
+            created.status === "COMPLETED"
+              ? "Walk-in recorded — commission added."
+              : `Walk-in booked for ${formatAdminDate(created.appointmentDate)}.`,
+          );
+          if (created.appointmentDate !== date) setDate(created.appointmentDate);
           else refresh();
         }}
       />

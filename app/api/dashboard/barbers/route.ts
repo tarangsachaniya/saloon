@@ -26,8 +26,12 @@ export async function GET(request: NextRequest) {
       where: { salonId: auth.salonId },
       orderBy: { id: "asc" },
       include: { services: { select: { id: true, name: true } } },
-      // Commission % is owner-only; staff and every other route never receive it.
-      omit: { commissionPercentage: auth.user.role !== "OWNER" },
+      // Commission rate is owner-only; staff and every other route never receive it.
+      omit: {
+        commissionPercentage: auth.user.role !== "OWNER",
+        commissionType: auth.user.role !== "OWNER",
+        commissionFlatAmount: auth.user.role !== "OWNER",
+      },
     });
     return NextResponse.json({ success: true, barbers }, { status: 200 });
   } catch (error) {

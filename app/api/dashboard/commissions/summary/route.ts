@@ -9,7 +9,8 @@ import { parseRange } from "@/lib/server/commissionQuery";
 /**
  * GET /api/dashboard/commissions/summary?from=&to=
  * OWNER only. One entry per worker of the caller's salon, totals built from the
- * stored commission rows (snapshots), never from the worker's current percentage.
+ * stored commission rows (snapshots), never from the worker's current rate.
+ * Online bookings and walk-ins both earn commission; they are counted apart.
  */
 
 export const dynamic = "force-dynamic";
@@ -24,11 +25,18 @@ export async function GET(request: NextRequest) {
     const [barbers, groups] = await Promise.all([
       prisma.barber.findMany({
         where: { salonId: auth.salonId },
-        select: { id: true, name: true, isActive: true, commissionPercentage: true },
+        select: {
+          id: true,
+          name: true,
+          isActive: true,
+          commissionPercentage: true,
+          commissionType: true,
+          commissionFlatAmount: true,
+        },
         orderBy: { id: "asc" },
       }),
       prisma.workerCommission.groupBy({
-        by: ["barberId", "status"],
+        by: ["barberId", "status", "source"],
         where: { salonId: auth.salonId, ...appointmentDateFilter(range.from, range.to) },
         _count: { _all: true },
         _sum: { serviceAmount: true, commissionAmount: true },
@@ -38,19 +46,26 @@ export async function GET(request: NextRequest) {
     const workers = barbers.map((b) => {
       const mine = groups.filter((g) => g.barberId === b.id);
       const total = (pick: (g: (typeof mine)[number]) => number) => mine.reduce((t, g) => t + pick(g), 0);
-      const paid = mine.find((g) => g.status === "PAID");
-      const pending = mine.find((g) => g.status === "PENDING");
+      type Group = (typeof mine)[number];
+      const sumWhere = (keep: (g: Group) => boolean, pick: (g: Group) => number) =>
+        mine.filter(keep).reduce((t, g) => t + pick(g), 0);
+      const amount = (g: Group) => Number(g._sum.commissionAmount ?? 0);
+      const count = (g: Group) => g._count._all;
       return {
         id: b.id,
         name: b.name,
         isActive: b.isActive,
+        commissionType: b.commissionType,
         commissionPercentage: Number(b.commissionPercentage),
+        commissionFlatAmount: Number(b.commissionFlatAmount),
         completedServices: total((g) => g._count._all),
         totalServiceAmount: total((g) => Number(g._sum.serviceAmount ?? 0)),
         totalCommission: total((g) => Number(g._sum.commissionAmount ?? 0)),
-        pendingCommission: Number(pending?._sum.commissionAmount ?? 0),
-        paidCommission: Number(paid?._sum.commissionAmount ?? 0),
-        pendingCount: pending?._count._all ?? 0,
+        pendingCommission: sumWhere((g) => g.status === "PENDING", amount),
+        paidCommission: sumWhere((g) => g.status === "PAID", amount),
+        pendingCount: sumWhere((g) => g.status === "PENDING", count),
+        onlineCount: sumWhere((g) => g.source === "ONLINE", count),
+        walkInCount: sumWhere((g) => g.source === "WALK_IN", count),
       };
     });
     return NextResponse.json({ success: true, workers });

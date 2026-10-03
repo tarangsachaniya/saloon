@@ -65,7 +65,8 @@ const EMPTY_CUSTOMER: CustomerDetails = {
 };
 
 export interface BookingState {
-  service: Service | null;
+  /** Chosen services, in the order picked; one barber does them back-to-back. */
+  services: Service[];
   /** null = not chosen yet; ANY_BARBER = customer picked "Any Barber". */
   barber: Barber | null;
   isAnyBarber: boolean;
@@ -78,7 +79,7 @@ export interface BookingState {
 }
 
 const INITIAL_STATE: BookingState = {
-  service: null,
+  services: [],
   barber: null,
   isAnyBarber: false,
   date: null,
@@ -87,7 +88,25 @@ const INITIAL_STATE: BookingState = {
   confirmedAppointment: null,
 };
 
+/**
+ * The chosen services seen as one: first id, joined name, summed duration and
+ * price. What the barber/slot/summary steps need ("how long, how much").
+ */
+export function bundleServices(services: Service[]): Service | null {
+  if (services.length === 0) return null;
+  if (services.length === 1) return services[0];
+  return {
+    ...services[0],
+    name: services.map((s) => s.name).join(" + "),
+    durationMinutes: services.reduce((sum, s) => sum + s.durationMinutes, 0),
+    price: services.reduce((sum, s) => sum + Number(s.price), 0),
+  };
+}
+
 export interface BookingContextValue extends BookingState {
+  /** `bundleServices(services)`: null until at least one service is chosen. */
+  service: Service | null;
+  serviceIds: string[];
   /**
    * The value to send to the API as `barberId` — a concrete id, "any", or null
    * when the customer has not chosen yet.
@@ -98,7 +117,10 @@ export interface BookingContextValue extends BookingState {
   /** The furthest step the customer may jump to right now. */
   canGoToStep: (step: BookingStep) => boolean;
 
-  selectService: (service: Service) => void;
+  /** Add or remove one service. */
+  toggleService: (service: Service) => void;
+  /** Replace the selection (e.g. "book again"). */
+  selectServices: (services: Service[]) => void;
   selectBarber: (barber: Barber) => void;
   selectAnyBarber: () => void;
   selectDate: (date: DateString) => void;
@@ -122,21 +144,34 @@ export function BookingProvider({ children }: { children: ReactNode }) {
    * computed for a different service/barber/date.
    */
 
-  const selectService = useCallback((service: Service) => {
-    setState((prev) =>
-      prev.service?.id === service.id
-        ? prev
-        : {
-            ...prev,
-            service,
-            barber: null,
-            isAnyBarber: false,
-            date: null,
-            slot: null,
-            confirmedAppointment: null,
-          },
-    );
+  const selectServices = useCallback((services: Service[]) => {
+    setState((prev) => ({
+      ...prev,
+      services,
+      barber: null,
+      isAnyBarber: false,
+      date: null,
+      slot: null,
+      confirmedAppointment: null,
+    }));
   }, []);
+
+  const toggleService = useCallback((service: Service) => {
+    setState((prev) => ({
+      ...prev,
+      services: prev.services.some((s) => s.id === service.id)
+        ? prev.services.filter((s) => s.id !== service.id)
+        : [...prev.services, service],
+      barber: null,
+      isAnyBarber: false,
+      date: null,
+      slot: null,
+      confirmedAppointment: null,
+    }));
+  }, []);
+
+  const service = useMemo(() => bundleServices(state.services), [state.services]);
+  const serviceIds = useMemo(() => state.services.map((s) => s.id), [state.services]);
 
   const selectBarber = useCallback((barber: Barber) => {
     setState((prev) =>
@@ -184,7 +219,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   const completedSteps = useMemo(() => {
     const done = new Set<BookingStep>();
-    if (state.service) done.add("service");
+    if (state.services.length > 0) done.add("service");
     if (state.barber || state.isAnyBarber) done.add("barber");
     if (state.date) done.add("date");
     if (state.slot) done.add("slot");
@@ -214,10 +249,13 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const value = useMemo<BookingContextValue>(
     () => ({
       ...state,
+      service,
+      serviceIds,
       barberSelection,
       completedSteps,
       canGoToStep,
-      selectService,
+      toggleService,
+      selectServices,
       selectBarber,
       selectAnyBarber,
       selectDate,
@@ -228,10 +266,13 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
+      service,
+      serviceIds,
       barberSelection,
       completedSteps,
       canGoToStep,
-      selectService,
+      toggleService,
+      selectServices,
       selectBarber,
       selectAnyBarber,
       selectDate,

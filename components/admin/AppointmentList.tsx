@@ -19,6 +19,7 @@ import { formatPrice, initials } from "@/lib/utils/format";
 import { formatDuration, formatTime12h } from "@/lib/utils/time";
 import { formatAdminDate } from "@/lib/admin/format";
 import { getBarberPhotoUrl } from "@/lib/utils/barberImages";
+import { appointmentServiceNames } from "@/lib/booking/serviceNames";
 
 /**
  * Appointment rendering, shared by the diary (`/dashboard/appointments`) and the
@@ -152,7 +153,7 @@ export function AppointmentList({
                           onClick={() => onOpen(appointment)}
                           className="rounded text-left font-semibold text-primary underline-offset-2 hover:text-secondary-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
                         >
-                          {appointment.client?.name ?? "Unknown client"}
+                          {appointment.client?.name ?? (appointment.source === "WALK_IN" ? "Walk-in" : "Unknown client")}
                         </button>
                         {appointment.client?.phone && (
                           <span className="block text-xs text-slate-500">
@@ -163,7 +164,7 @@ export function AppointmentList({
                     </div>
                   </TableCell>
 
-                  <TableCell className="text-slate-700">{appointment.service?.name ?? "—"}</TableCell>
+                  <TableCell className="text-slate-700">{appointmentServiceNames(appointment)}</TableCell>
 
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -248,10 +249,10 @@ export function AppointmentList({
                       {formatSlot(appointment)}
                     </p>
                     <p className="mt-0.5 truncate text-base font-semibold text-primary">
-                      {appointment.client?.name ?? "Unknown client"}
+                      {appointment.client?.name ?? (appointment.source === "WALK_IN" ? "Walk-in" : "Unknown client")}
                     </p>
                     <p className="text-xs text-slate-600">
-                      {appointment.service?.name ?? "—"}
+                      {appointmentServiceNames(appointment)}
                       {appointment.barber?.name ? ` · ${appointment.barber.name}` : ""}
                     </p>
                   </div>
@@ -315,10 +316,10 @@ export function AppointmentTimeline({
             </div>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-primary">
-                {appointment.client?.name ?? "Unknown client"}
+                {appointment.client?.name ?? (appointment.source === "WALK_IN" ? "Walk-in" : "Unknown client")}
               </span>
               <span className="block truncate text-xs text-slate-600">
-                {appointment.service?.name ?? "—"}
+                {appointmentServiceNames(appointment)}
                 {appointment.barber?.name ? ` · ${appointment.barber.name}` : ""}
                 {` · ${formatDuration(appointment.durationMinutes)}`}
               </span>

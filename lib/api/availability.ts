@@ -7,7 +7,9 @@ import type {
 import type { RequestOptions } from "./client";
 
 /**
- * `GET /api/s/:slug/availability?serviceId=&barberId=&date=&excludeAppointmentId=`
+ * `GET /api/s/:slug/availability?serviceIds=&barberId=&date=&excludeAppointmentId=`
+ *
+ * `serviceIds` are done back-to-back by one barber: slots fit their total duration.
  *
  * `barberId` may be a concrete id or the literal "any" (see `ANY_BARBER`).
  * `date` must be "YYYY-MM-DD".
@@ -30,7 +32,7 @@ export function getAvailability(
     auth: false,
     ...options,
     query: {
-      serviceId: params.serviceId,
+      serviceIds: params.serviceIds.join(","),
       barberId: params.barberId,
       date: params.date,
       excludeAppointmentId: params.excludeAppointmentId,

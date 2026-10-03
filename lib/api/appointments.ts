@@ -5,6 +5,7 @@ import type {
   Appointment,
   CreateAppointmentResult,
   CreateAppointmentPayload,
+  CreateWalkInPayload,
   UpdateAppointmentPayload,
 } from "@/lib/booking/types";
 import type { RequestOptions } from "./client";
@@ -57,6 +58,16 @@ export async function createAppointment(
 }
 
 /* --------------------------------- Admin ---------------------------------- */
+
+/**
+ * `POST /api/dashboard/appointments` — owner or staff record offline work: a
+ * completed sale, or a walk-in placed on the calendar. Throws `ApiError` on
+ * failure (the dialog shows its message).
+ */
+export async function createWalkIn(payload: CreateWalkInPayload, options?: RequestOptions): Promise<Appointment> {
+  const data = await post<{ success: true; appointment: Appointment }>("/dashboard/appointments", payload, options);
+  return normalizeAppointment(data.appointment);
+}
 
 /**
  * `GET /api/dashboard/appointments?date=&from=&to=&barberId=&status=`

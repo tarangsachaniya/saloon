@@ -7,7 +7,7 @@ import { appointmentDateFilter } from "@/lib/server/commissions";
 import { parseRange } from "@/lib/server/commissionQuery";
 
 /**
- * GET /api/dashboard/commissions?barberId=&status=&from=&to=
+ * GET /api/dashboard/commissions?barberId=&status=&source=&from=&to=
  * OWNER only. Commission history (newest appointment first, max 200), scoped to
  * the caller's salon. Service name and date come from the real appointment.
  */
@@ -28,6 +28,11 @@ export async function GET(request: NextRequest) {
     if (rawStatus && !status) {
       return NextResponse.json({ success: false, message: "Invalid status." }, { status: 400 });
     }
+    const rawSource = q.get("source");
+    const source = rawSource === "ONLINE" || rawSource === "WALK_IN" ? rawSource : null;
+    if (rawSource && !source) {
+      return NextResponse.json({ success: false, message: "Invalid source." }, { status: 400 });
+    }
     if (barberId) {
       const own = await prisma.barber.findFirst({ where: { id: barberId, salonId: auth.salonId }, select: { id: true } });
       if (!own) return NextResponse.json({ success: false, message: "Worker not found." }, { status: 404 });
@@ -38,10 +43,18 @@ export async function GET(request: NextRequest) {
         salonId: auth.salonId,
         ...(barberId ? { barberId } : {}),
         ...(status ? { status } : {}),
+        ...(source ? { source } : {}),
         ...appointmentDateFilter(range.from, range.to),
       },
       include: {
-        appointment: { select: { appointmentDate: true, startTime: true, service: { select: { name: true } } } },
+        appointment: {
+          select: {
+            appointmentDate: true,
+            startTime: true,
+            service: { select: { name: true } },
+            services: { select: { name: true }, orderBy: { sortOrder: "asc" } },
+          },
+        },
         barber: { select: { name: true } },
       },
       orderBy: [{ appointment: { appointmentDate: "desc" } }, { appointment: { startTime: "desc" } }],
@@ -55,7 +68,13 @@ export async function GET(request: NextRequest) {
         appointmentId: r.appointmentId,
         barberId: r.barberId,
         barberName: r.barber.name,
-        serviceName: r.appointment.service.name,
+        serviceName: r.appointment.services.length
+          ? r.appointment.services.map((s) => s.name).join(" + ")
+          : r.appointment.service.name,
+        source: r.source,
+        commissionType: r.commissionType,
+        flatAmount: Number(r.flatAmount),
+        serviceCount: r.serviceCount,
         date: r.appointment.appointmentDate.toISOString().slice(0, 10),
         commissionPercentage: Number(r.commissionPercentage),
         serviceAmount: Number(r.serviceAmount),

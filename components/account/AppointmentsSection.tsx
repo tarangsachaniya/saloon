@@ -57,7 +57,8 @@ function AppointmentCard({
   onCancel: () => void;
   onReschedule: () => void;
 }) {
-  const bookAgain = `/s/${a.salon.slug}/book?serviceId=${encodeURIComponent(a.service.id)}&barberId=${encodeURIComponent(a.barber.id)}`;
+  const serviceIds = a.services?.map((s) => s.id) ?? [a.service.id];
+  const bookAgain = `/s/${a.salon.slug}/book?serviceIds=${encodeURIComponent(serviceIds.join(","))}&barberId=${encodeURIComponent(a.barber.id)}`;
   const upcoming = a.bucket === "upcoming";
 
   return (

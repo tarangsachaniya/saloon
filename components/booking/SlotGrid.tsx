@@ -75,22 +75,22 @@ export function SlotButton({
 }
 
 export function SlotGrid({ onSelected, onChangeDate }: SlotGridProps) {
-  const { service, barber, isAnyBarber, barberSelection, date, slot: selected, selectSlot } =
+  const { serviceIds, barber, isAnyBarber, barberSelection, date, slot: selected, selectSlot } =
     useBooking();
   const { slug } = useSalon();
 
-  const serviceId = service?.id ?? null;
+  const serviceKey = serviceIds.join(",");
 
   const { data, error, isLoading, reload } = useAsync<AvailabilityResponse | null>(
     (signal) =>
-      serviceId && barberSelection && date
+      serviceKey && barberSelection && date
         ? getAvailability(
             slug,
-            { serviceId, barberId: barberSelection, date },
+            { serviceIds: serviceKey.split(","), barberId: barberSelection, date },
             { signal },
           )
         : Promise.resolve(null),
-    [slug, serviceId, barberSelection, date],
+    [slug, serviceKey, barberSelection, date],
   );
 
   // A slot chosen earlier (customer went back) may have been taken since the

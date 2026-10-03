@@ -20,6 +20,7 @@ export {
 } from "./availability";
 export {
   createAppointment,
+  createWalkIn,
   getAdminAppointment,
   getAdminAppointments,
   updateAppointment,

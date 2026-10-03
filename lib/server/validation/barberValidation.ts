@@ -37,6 +37,8 @@ const barberFields = {
   bio: z.string().max(1000).optional().nullable(),
   specializations: z.array(z.string().max(80)).optional(),
   isActive: z.boolean().optional(),
+  // Off = customers cannot pre-book this worker online (walk-ins only).
+  onlineBookingEnabled: z.boolean().optional(),
   serviceIds: z.array(idString).optional(),
   workingHours: z.array(workingHour).optional(),
   breaks: z.array(breakEntry).optional(),

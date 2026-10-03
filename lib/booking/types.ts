@@ -93,8 +93,14 @@ export interface Barber {
   bio: string | null;
   specializations: string[];
   isActive: boolean;
+  /** Customers may pre-book this worker online. False = walk-ins only. */
+  onlineBookingEnabled?: boolean;
   /** Owner dashboard only (never sent to staff or the public site). Decimal string on the wire. */
   commissionPercentage?: number | string;
+  /** Owner dashboard only: PERCENT of the amount, or FLAT per service. */
+  commissionType?: "PERCENT" | "FLAT";
+  /** Owner dashboard only. Decimal string on the wire. */
+  commissionFlatAmount?: number | string;
   services?: Array<
     Pick<Service, "id" | "name"> & Partial<Pick<Service, "durationMinutes" | "price" | "isActive">>
   >;
@@ -116,7 +122,7 @@ export interface Slot {
   available: boolean;
 }
 
-/** `GET /api/availability?serviceId=&barberId=&date=` */
+/** `GET /api/availability?serviceIds=&barberId=&date=` */
 export interface AvailabilityResponse {
   /** "YYYY-MM-DD" */
   date: DateString;
@@ -128,7 +134,8 @@ export interface AvailabilityResponse {
 }
 
 export interface AvailabilityQuery {
-  serviceId: string;
+  /** Done back-to-back by one barber, in this order. */
+  serviceIds: string[];
   barberId: BarberSelection;
   /** "YYYY-MM-DD" */
   date: DateString;
@@ -158,10 +165,25 @@ export const APPOINTMENT_STATUSES: readonly AppointmentStatus[] = [
   "NO_SHOW",
 ] as const;
 
+/** Where an appointment came from: booked online, or recorded by the salon. */
+export type AppointmentSource = "ONLINE" | "WALK_IN";
+
+/** One service of an appointment (name/price/duration as booked). */
+export interface AppointmentServiceItem {
+  id: string;
+  serviceId: string;
+  name: string;
+  price: number;
+  durationMinutes: number;
+  sortOrder: number;
+}
+
 export interface Appointment {
   id: string;
-  clientId: string;
+  /** Null for an anonymous walk-in. */
+  clientId: string | null;
   barberId: string;
+  /** The first service; all of them are in `services`. */
   serviceId: string;
   /**
    * "YYYY-MM-DD".
@@ -174,11 +196,19 @@ export interface Appointment {
   startTime: MinutesSinceMidnight;
   /** Minutes since midnight. */
   endTime: MinutesSinceMidnight;
+  /** Total over all services. */
   durationMinutes: number;
-  /** Also a string on the wire — normalised to a number. See `Service.price`. */
+  /** Total list price. Also a string on the wire — normalised to a number. See `Service.price`. */
   price: number;
+  /** What was actually charged, when owner/staff entered it (commission uses it). */
+  amountCharged?: number | null;
   status: AppointmentStatus;
+  source?: AppointmentSource;
+  /** False for a recorded sale (not on the calendar). */
+  blocksCalendar?: boolean;
   notes: string | null;
+  /** Every service, in booking order. */
+  services?: AppointmentServiceItem[];
   /**
    * The backend always includes these three relations (booking creation and
    * every admin appointment endpoint) — optional here only because a caller
@@ -191,7 +221,8 @@ export interface Appointment {
 
 /** Request body for `POST /api/appointments`. */
 export interface CreateAppointmentPayload {
-  serviceId: string;
+  /** One or more services, done back-to-back by one barber. */
+  serviceIds: string[];
   /** A barber id, or "any" to let the backend allocate one. */
   barberId: BarberSelection;
   /** "YYYY-MM-DD" */
@@ -233,6 +264,22 @@ export interface UpdateAppointmentPayload {
   date?: DateString;
   /** "HH:MM" */
   startTime?: TimeString;
+  /** What the customer actually paid (until the visit is completed). */
+  amountCharged?: number | null;
+}
+
+/** Body for `POST /api/dashboard/appointments` (owner/staff recording a walk-in). */
+export interface CreateWalkInPayload {
+  /** "sale": work already done (completed now); "appointment": book on the calendar. */
+  mode: "sale" | "appointment";
+  barberId: string;
+  serviceIds: string[];
+  customerName?: string | null;
+  customerPhone?: string | null;
+  amountCharged?: number | null;
+  date?: DateString;
+  startTime?: TimeString;
+  notes?: string | null;
 }
 
 /** Query filters for `GET /api/admin/appointments`. */
@@ -347,6 +394,8 @@ export interface User {
   role: UserRole;
   /** Null for SUPER_ADMIN. */
   salonId: string | null;
+  /** STAFF with their own (owner-created) login: the worker they are. */
+  barberId?: string | null;
   salonSlug: string | null;
   salonName: string | null;
 }
@@ -395,6 +444,7 @@ export interface CreateBarberPayload {
   bio?: string | null;
   specializations?: string[];
   isActive?: boolean;
+  onlineBookingEnabled?: boolean;
   /** Service ids this barber is qualified to perform. */
   serviceIds?: string[];
   /**

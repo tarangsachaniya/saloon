@@ -41,6 +41,8 @@ interface NavItem {
   Icon: typeof DashboardIcon;
   /** Hidden from salon staff (the API is owner-only too). */
   ownerOnly?: boolean;
+  /** Also shown to a worker with their own login (their own view of it). */
+  workerToo?: boolean;
   /** `/dashboard` must match exactly or it would light up on every child route. */
   exact?: boolean;
 }
@@ -51,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/barbers", label: "Barbers", shortLabel: "Barbers", Icon: ScissorsIcon },
   { href: "/dashboard/services", label: "Services", shortLabel: "Services", Icon: TagIcon },
   { href: "/dashboard/clients", label: "Clients", shortLabel: "Clients", Icon: UsersIcon },
-  { href: "/dashboard/earnings", label: "Earnings", shortLabel: "Earnings", Icon: TagIcon, ownerOnly: true },
+  { href: "/dashboard/earnings", label: "Earnings", shortLabel: "Earnings", Icon: TagIcon, ownerOnly: true, workerToo: true },
   { href: "/dashboard/settings", label: "Settings", shortLabel: "Settings", Icon: SettingsIcon },
 ];
 
@@ -79,7 +81,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
     }
   }, [isLoading, token, user, pathname, router]);
 
-  const navItems = NAV_ITEMS.filter((item) => !item.ownerOnly || user?.role === "OWNER");
+  const navItems = NAV_ITEMS.filter(
+    (item) => !item.ownerOnly || user?.role === "OWNER" || (item.workerToo && Boolean(user?.barberId)),
+  );
   const displayName = user ? `${user.firstName} ${user.lastName ?? ""}`.trim() : "";
   const salonName = user?.salonName ?? "Salon Admin";
   const shopHref = user?.salonSlug ? `/s/${user.salonSlug}` : "/";

@@ -4,13 +4,14 @@ import {
   AvailabilityError,
   computeAvailability,
   isValidDateString,
+  serviceIdsFromQuery,
 } from "@/lib/server/availability";
 import { handleRouteError } from "@/lib/server/http";
 import { resolveSalon } from "@/lib/server/salon";
 
 
 /**
- * GET /api/s/[slug]/availability?serviceId=&barberId=&date=&excludeAppointmentId=
+ * GET /api/s/[slug]/availability?serviceIds=&barberId=&date=&excludeAppointmentId=
  *
  * Port of `availabilityController.getAvailability`. `barberId` is optional and
  * defaults to "any".
@@ -33,14 +34,14 @@ export async function GET(
     const salon = gate.salon;
 
     const searchParams = request.nextUrl.searchParams;
-    const serviceId = searchParams.get("serviceId");
+    const serviceIds = serviceIdsFromQuery(searchParams);
     const date = searchParams.get("date");
     const barberId = searchParams.get("barberId") || "any";
     const excludeAppointmentId = searchParams.get("excludeAppointmentId");
 
-    if (!serviceId) {
+    if (serviceIds.length === 0) {
       return NextResponse.json(
-        { success: false, message: "serviceId is required." },
+        { success: false, message: "serviceIds is required." },
         { status: 400 },
       );
     }
@@ -59,13 +60,14 @@ export async function GET(
 
     const result = await computeAvailability({
       salonId: salon.id,
-      serviceId,
+      serviceIds,
       barberId,
       date,
       excludeAppointmentId: excludeAppointmentId || null,
       // The customer wizard never passes an appointment to exclude; staff
       // rescheduling does, and may move an appointment on an inactive service.
       bookableOnly: !excludeAppointmentId,
+      onlineBooking: !excludeAppointmentId,
     });
     return NextResponse.json({ success: true, ...result }, { status: 200 });
   } catch (error) {

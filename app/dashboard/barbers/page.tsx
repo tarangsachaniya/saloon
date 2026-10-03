@@ -3,7 +3,9 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { BarberFormDialog } from "@/components/admin/BarberFormDialog";
-import { CommissionDialog } from "@/components/admin/CommissionDialog";
+import { CommissionDialog, formatCommissionRate } from "@/components/admin/CommissionDialog";
+import { WorkerLoginDialog } from "@/components/admin/WorkerLoginDialog";
+import type { CommissionRate } from "@/lib/api/commissions";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { PlusIcon, RefreshIcon } from "@/components/admin/icons";
 import { LoadError, PageHeader } from "@/components/admin/PageHeader";
@@ -40,6 +42,15 @@ import { getBarberPhotoUrl } from "@/lib/utils/barberImages";
  * services: the backend refuses a hard delete for anyone with appointment
  * history, and deactivating is what retiring a barber actually means.
  */
+/** The owner-only commission fields of a barber (Decimal strings on the wire). */
+function rateOf(barber: Barber): CommissionRate {
+  return {
+    commissionType: barber.commissionType ?? "PERCENT",
+    commissionPercentage: Number(barber.commissionPercentage ?? 0),
+    commissionFlatAmount: Number(barber.commissionFlatAmount ?? 0),
+  };
+}
+
 export default function BarbersPage() {
   const { toasts, push, dismiss } = useToasts();
 
@@ -62,6 +73,7 @@ export default function BarbersPage() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [commissionFor, setCommissionFor] = useState<Barber | null>(null);
+  const [loginFor, setLoginFor] = useState<Barber | null>(null);
 
   const barbers = useMemo(() => data?.barbers ?? [], [data]);
   const services: Service[] = useMemo(() => data?.services ?? [], [data]);
@@ -178,6 +190,11 @@ export default function BarbersPage() {
                       <Badge tone={barber.isActive ? "success" : "neutral"} className="text-[10px]">
                         {barber.isActive ? "Active" : "Inactive"}
                       </Badge>
+                      {barber.isActive && barber.onlineBookingEnabled === false && (
+                        <Badge tone="warning" className="text-[10px]">
+                          Walk-ins only
+                        </Badge>
+                      )}
                     </div>
                     <p className="truncate text-xs text-slate-500 mt-0.5">
                       {barber.phone ?? barber.email ?? "No contact details"}
@@ -206,7 +223,7 @@ export default function BarbersPage() {
                 {barber.commissionPercentage !== undefined && (
                   <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2">
                     <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Commission</p>
-                    <p className="text-sm font-bold text-primary">{Number(barber.commissionPercentage)}%</p>
+                    <p className="text-sm font-bold text-primary">{formatCommissionRate(rateOf(barber))}</p>
                   </div>
                 )}
 
@@ -221,6 +238,12 @@ export default function BarbersPage() {
                   {barber.commissionPercentage !== undefined && (
                     <Button size="sm" variant="outline" onClick={() => setCommissionFor(barber)}>
                       Edit commission
+                    </Button>
+                  )}
+                  {/* Owner only (same signal as the commission fields). */}
+                  {barber.commissionPercentage !== undefined && (
+                    <Button size="sm" variant="outline" onClick={() => setLoginFor(barber)}>
+                      Login
                     </Button>
                   )}
                   {barber.isActive ? (
@@ -262,19 +285,21 @@ export default function BarbersPage() {
         </p>
       )}
 
+      <WorkerLoginDialog worker={loginFor} onClose={() => setLoginFor(null)} />
+
       <CommissionDialog
         worker={
           commissionFor
-            ? { id: commissionFor.id, name: commissionFor.name, commissionPercentage: Number(commissionFor.commissionPercentage) }
+            ? { id: commissionFor.id, name: commissionFor.name, ...rateOf(commissionFor) }
             : null
         }
         onClose={() => setCommissionFor(null)}
-        onSaved={(workerId, percentage) => {
+        onSaved={(workerId, rate) => {
           const name = commissionFor?.name ?? "Worker";
           setCommissionFor(null);
           setData((current) =>
             current
-              ? { ...current, barbers: current.barbers.map((b) => (b.id === workerId ? { ...b, commissionPercentage: percentage } : b)) }
+              ? { ...current, barbers: current.barbers.map((b) => (b.id === workerId ? { ...b, ...rate } : b)) }
               : current,
           );
           push("success", `${name} — commission updated successfully.`);

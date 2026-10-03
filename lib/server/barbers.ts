@@ -66,7 +66,7 @@ export function scheduleWrites(body: Body): Record<string, unknown> {
 
 export function scalarFields(body: Body): Record<string, unknown> {
   const data: Record<string, unknown> = {};
-  for (const field of ["name", "phone", "email", "photo", "bio", "isActive"]) {
+  for (const field of ["name", "phone", "email", "photo", "bio", "isActive", "onlineBookingEnabled"]) {
     if (body[field] !== undefined) data[field] = body[field];
   }
   if (Array.isArray(body.specializations)) data.specializations = body.specializations;

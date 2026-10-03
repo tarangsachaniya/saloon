@@ -45,7 +45,10 @@ export interface MyAppointment {
   durationMinutes: number;
   price: number;
   salon: { name: string; slug: string };
+  /** First service id; `name` joins every service ("Cut + Beard"). */
   service: { id: string; name: string };
+  /** Every service of the booking, in order. */
+  services?: { id: string; name: string; price: number; durationMinutes: number }[];
   barber: { id: string; name: string };
   canCancel: boolean;
   cancelBlockedReason: string | null;

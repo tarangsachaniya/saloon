@@ -15,14 +15,16 @@ import { PrismaClient } from "@prisma/client";
  */
 
 /**
- * Worker commission is internal: `omit` hides it from EVERY query (including
+ * Worker commission (percentage, type, flat amount) is internal: `omit` hides it from EVERY query (including
  * nested `include: { barber: true }` on public booking responses) unless a
  * query explicitly opts in with `omit: { commissionPercentage: false }`. Only
  * the owner-only commission code does that, so a new route can never leak it
  * by forgetting to strip a field.
  */
 function createClient() {
-  return new PrismaClient({ omit: { barber: { commissionPercentage: true } } });
+  return new PrismaClient({
+    omit: { barber: { commissionPercentage: true, commissionType: true, commissionFlatAmount: true } },
+  });
 }
 
 const globalForPrisma = globalThis as unknown as {

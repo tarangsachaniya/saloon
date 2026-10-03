@@ -39,7 +39,7 @@ const OWNER_PASSWORD = "TestOwner123!";
 
 let salon: Salon;
 let service: Service;
-let barber: Omit<Barber, "commissionPercentage">;
+let barber: Omit<Barber, "commissionPercentage" | "commissionType" | "commissionFlatAmount">;
 let owner: User;
 let token: string;
 let bookingDate: string;

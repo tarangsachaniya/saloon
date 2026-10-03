@@ -5,7 +5,7 @@ import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/server/prisma";
 import * as availability from "@/lib/server/availability";
 import { requireAdmin } from "@/lib/server/auth";
-import { APPOINTMENT_INCLUDE, isValidTransition } from "@/lib/server/appointments";
+import { APPOINTMENT_INCLUDE, isValidTransition, serviceItemsCreate } from "@/lib/server/appointments";
 import { isExclusionViolation, SLOT_TAKEN_MESSAGE } from "@/lib/server/dbErrors";
 import { ensureCommissionForCompleted } from "@/lib/server/commissions";
 import { handleRouteError, parseJsonBody } from "@/lib/server/http";
@@ -19,6 +19,10 @@ import { updateAppointmentBodySchema } from "@/lib/server/validation/appointment
  * time / service), re-running the FULL availability re-check for the latter —
  * the same code path a customer booking goes through, with the appointment's
  * own row excluded from the overlap check.
+ *
+ * Owner or staff may also enter `amountCharged` (what the customer actually
+ * paid) until the visit is COMPLETED: worker commission is snapshotted from it
+ * at completion, at the rate the owner set.
  */
 
 export const dynamic = "force-dynamic";
@@ -66,11 +70,15 @@ export async function PATCH(
       serviceId?: string;
       date?: string;
       startTime?: string;
+      amountCharged?: number | null;
     }>(request, updateAppointmentBodySchema);
     if ("error" in parsed) return parsed.error;
     const body = parsed.body;
 
-    const existing = await prisma.appointment.findFirst({ where: { id, salonId } });
+    const existing = await prisma.appointment.findFirst({
+      where: { id, salonId },
+      include: { services: { orderBy: { sortOrder: "asc" } } },
+    });
     if (!existing) {
       return NextResponse.json(
         { success: false, message: "Appointment not found." },
@@ -81,6 +89,18 @@ export async function PATCH(
     const data: Prisma.AppointmentUncheckedUpdateInput = {};
 
     if (body.notes !== undefined) data.notes = body.notes || null;
+
+    if (body.amountCharged !== undefined) {
+      // Commission is snapshotted at completion; changing the amount afterwards
+      // would silently disagree with it.
+      if (existing.status === "COMPLETED") {
+        return NextResponse.json(
+          { success: false, message: "This visit is already completed; its amount is final." },
+          { status: 400 },
+        );
+      }
+      data.amountCharged = body.amountCharged;
+    }
 
     if (body.status !== undefined && body.status !== existing.status) {
       if (!isValidTransition(existing.status, body.status)) {
@@ -101,7 +121,13 @@ export async function PATCH(
 
     // --- reschedule ---------------------------------------------------
     const currentDate = availability.utcDateString(existing.appointmentDate);
-    const targetServiceId = body.serviceId || existing.serviceId;
+    // A new `serviceId` replaces the services with that one; otherwise the
+    // booking keeps all of its services (rows predating multi-service have none).
+    const currentServiceIds = existing.services.length
+      ? existing.services.map((s) => s.serviceId)
+      : [existing.serviceId];
+    const serviceChanged = Boolean(body.serviceId) && body.serviceId !== existing.serviceId;
+    const targetServiceIds = serviceChanged ? [body.serviceId as string] : currentServiceIds;
     const targetBarberId = body.barberId || existing.barberId;
     const targetDate = body.date || currentDate;
     const targetStart =
@@ -110,12 +136,18 @@ export async function PATCH(
         : existing.startTime;
 
     const isReschedule =
-      targetServiceId !== existing.serviceId ||
+      serviceChanged ||
       targetBarberId !== existing.barberId ||
       targetDate !== currentDate ||
       targetStart !== existing.startTime;
 
     if (isReschedule) {
+      if (!existing.blocksCalendar) {
+        return NextResponse.json(
+          { success: false, message: "A recorded sale is not on the calendar and cannot be rescheduled." },
+          { status: 400 },
+        );
+      }
       if (targetStart === null) {
         return NextResponse.json(
           { success: false, message: "Invalid startTime. Expected format HH:MM." },
@@ -124,7 +156,7 @@ export async function PATCH(
       }
       const resolved = await availability.resolveBooking({
         salonId,
-        serviceId: targetServiceId,
+        serviceIds: targetServiceIds,
         barberId: targetBarberId,
         date: targetDate,
         startTime: availability.minutesToHHMM(targetStart),
@@ -138,6 +170,9 @@ export async function PATCH(
       }
 
       data.serviceId = resolved.service.id;
+      if (serviceChanged) {
+        data.services = { deleteMany: {}, ...serviceItemsCreate(resolved.services) };
+      }
       data.barberId = resolved.barberId;
       data.appointmentDate = availability.parseDateOnly(targetDate);
       data.startTime = resolved.startTime;
@@ -182,7 +217,7 @@ export async function PATCH(
       throw error;
     }
 
-    if (data.status === "COMPLETED") {
+    if (data.status === "COMPLETED" && appointment.clientId) {
       await prisma.client.update({
         where: { id: appointment.clientId },
         data: { lastVisit: appointment.appointmentDate },
