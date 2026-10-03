@@ -17,6 +17,8 @@ export {
 } from "./Card";
 export type { CardProps, EmptyStateProps } from "./Card";
 
+export { LoadingRegion, Skeleton, SkeletonText } from "./Skeleton";
+
 export { Loader, Spinner } from "./Spinner";
 export type { LoaderProps, SpinnerProps, SpinnerSize } from "./Spinner";
 

@@ -11,6 +11,8 @@ import { formatDateLong, formatTime12h } from "@/lib/utils/time";
 import { formatPrice } from "@/lib/utils/format";
 import { CancelAppointmentDialog } from "./CancelAppointmentDialog";
 import { RescheduleAppointmentDialog } from "./RescheduleAppointmentDialog";
+import { BookingCardsSkeleton } from "@/components/loading/marketing";
+import { LoadingRegion } from "@/components/ui";
 
 type Bucket = MyAppointment["bucket"];
 
@@ -182,9 +184,9 @@ export function AppointmentsSection({
       {notice && <FormAlert tone="success">{notice}</FormAlert>}
 
       {isLoading && (
-        <p role="status" className="py-10 text-center font-chunky text-lg font-bold text-plum/60">
-          Loading appointments…
-        </p>
+        <LoadingRegion label="Loading appointments…">
+          <BookingCardsSkeleton count={2} />
+        </LoadingRegion>
       )}
 
       {error && (

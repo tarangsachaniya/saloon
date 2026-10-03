@@ -27,6 +27,7 @@ import {
   type PlatformSalonDetail,
 } from "@/lib/api/platform";
 import { HEX_COLOR, type ThemeId } from "@/lib/themes";
+import { PlatformDetailSkeleton } from "@/components/loading/marketing";
 
 function Notice({ tone, children }: { tone: "ok" | "error"; children: React.ReactNode }) {
   return (
@@ -339,7 +340,7 @@ export default function PlatformSalonPage() {
   );
   const onSaved = (s: PlatformSalonDetail) => setData(() => s);
 
-  if (isLoading && !salon) return <p className="font-bold text-plum/60" role="status">Loading salon…</p>;
+  if (isLoading && !salon) return <PlatformDetailSkeleton />;
   if (error && !salon)
     return (
       <div role="alert" className="rounded-2xl border-2 border-plum bg-tomato/25 p-4 font-semibold">

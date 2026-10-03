@@ -15,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
-  Loader,
   StatusPill,
 } from "@/components/ui";
 import { getAdminAppointments } from "@/lib/api";
@@ -30,6 +29,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { formatPrice } from "@/lib/utils/format";
 import { formatTime12h, startOfToday, toDateString } from "@/lib/utils/time";
 import { formatAdminDate } from "@/lib/admin/format";
+import { AdminDashboardSkeleton } from "@/components/loading/admin";
 
 /**
  * The Today screen — the one the front desk leaves open all day.
@@ -197,7 +197,7 @@ export default function AdminDashboardPage() {
         }
       />
 
-      {isLoading && <Loader label="Loading today's diary…" />}
+      {isLoading && <AdminDashboardSkeleton label="Loading today's diary…" />}
 
       {error && !data && <LoadError message={error} onRetry={refresh} />}
 

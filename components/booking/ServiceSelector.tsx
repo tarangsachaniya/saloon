@@ -6,12 +6,13 @@ import { getServices } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
 import { useSalon } from "@/lib/salon/SalonContext";
 import type { Service } from "@/lib/booking/types";
-import { Badge, Button, EmptyState, Loader } from "@/components/ui";
+import { Badge, Button, EmptyState } from "@/components/ui";
 import { formatPrice } from "@/lib/utils/format";
 import { formatDuration } from "@/lib/utils/time";
 import { getServiceImageUrl } from "@/lib/utils/barberImages";
 import { StepError, StepShell } from "./StepShell";
 import { useAsync } from "./useAsync";
+import { ServiceCardsSkeleton } from "@/components/loading/shop";
 
 export function ServiceSelector({ onSelected }: { onSelected: () => void }) {
   // Several services can be booked together; one barber does them back-to-back.
@@ -81,7 +82,7 @@ export function ServiceSelector({ onSelected }: { onSelected: () => void }) {
         </div>
       )}
 
-      {isLoading && <Loader label="Loading salon services…" />}
+      {isLoading && <ServiceCardsSkeleton />}
 
       {error && <StepError message={error} onRetry={reload} />}
 

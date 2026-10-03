@@ -10,7 +10,6 @@ import {
   buttonClasses,
   Card,
   EmptyState,
-  Loader,
   StatusPill,
 } from "@/components/ui";
 import { formatPrice } from "@/lib/utils/format";
@@ -22,6 +21,7 @@ import {
 } from "@/lib/utils/time";
 import { BarberAvatar } from "@/components/booking/BarberSelector";
 import { appointmentServiceNames } from "@/lib/booking/serviceNames";
+import { BookingPageSkeleton } from "@/components/loading/shop";
 
 export default function ConfirmationPage() {
   const router = useRouter();
@@ -37,7 +37,7 @@ export default function ConfirmationPage() {
   }
 
   if (isLeaving) {
-    return <Loader label="Starting a new booking…" />;
+    return <BookingPageSkeleton label="Starting a new booking…" />;
   }
 
   if (!confirmedAppointment) {

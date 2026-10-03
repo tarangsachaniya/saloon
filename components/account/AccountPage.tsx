@@ -12,6 +12,7 @@ import { AppointmentsSection } from "./AppointmentsSection";
 import { LogoutButton } from "./LogoutButton";
 import { ProfileForm } from "./ProfileForm";
 import { useMyAppointments } from "./useMyAppointments";
+import { AccountSkeleton } from "@/components/loading/marketing";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -88,11 +89,7 @@ export function AccountPage() {
   }
 
   if (!token || wrongRole || (!account && !failed)) {
-    return (
-      <p role="status" className="py-32 text-center font-chunky text-xl font-bold text-plum/60">
-        Loading your account…
-      </p>
-    );
+    return <AccountSkeleton />;
   }
   if (failed || !account) {
     return (

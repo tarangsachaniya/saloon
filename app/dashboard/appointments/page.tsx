@@ -15,7 +15,6 @@ import {
   Card,
   EmptyState,
   Input,
-  Loader,
   Select,
 } from "@/components/ui";
 import {
@@ -38,6 +37,7 @@ import {
 } from "@/lib/booking/types";
 import { addDays, fromDateString, isSameDay, startOfToday, toDateString } from "@/lib/utils/time";
 import { formatAdminDate } from "@/lib/admin/format";
+import { AdminListSkeleton } from "@/components/loading/admin";
 
 /**
  * The diary.
@@ -317,7 +317,7 @@ export default function AppointmentsPage() {
         )}
       </Card>
 
-      {isLoading && <Loader label="Loading appointments…" />}
+      {isLoading && <AdminListSkeleton label="Loading appointments…" />}
 
       {error && !data && <LoadError message={error} onRetry={refresh} />}
 

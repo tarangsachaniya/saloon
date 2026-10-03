@@ -3,13 +3,14 @@
 import { useMemo, useState } from "react";
 
 import { LoadError, PageHeader } from "@/components/admin/PageHeader";
-import { Badge, Card, EmptyState, Loader } from "@/components/ui";
+import { Badge, Card, EmptyState } from "@/components/ui";
 import { getMyEarnings, type DateRange } from "@/lib/api/commissions";
 import { useAdminData } from "@/lib/admin/useAdminData";
 import { cn } from "@/lib/utils/cn";
 import { formatPrice } from "@/lib/utils/format";
 import { formatDateLong, toDateString } from "@/lib/utils/time";
 import { formatCommissionRate } from "./CommissionDialog";
+import { AdminCardGridSkeleton } from "@/components/loading/admin";
 
 /** A signed-in worker's own commission: online bookings and walk-ins. Read-only. */
 
@@ -52,7 +53,7 @@ export function MyEarningsView() {
         ))}
       </div>
 
-      {isLoading && <Loader label="Loading your earnings…" />}
+      {isLoading && <AdminCardGridSkeleton count={3} label="Loading your earnings…" />}
       {error && !data && <LoadError message={error} onRetry={refresh} />}
 
       {data && (

@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { listSalonRequests } from "@/lib/api/platform";
 import { useAuth } from "@/lib/auth/useAuth";
 import { BRAND } from "@/lib/brand";
+import { PlatformListSkeleton } from "@/components/loading/marketing";
 
 const NAV = [
   { href: "/platform", label: "Salons", exact: true },
@@ -106,9 +107,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
         {ready ? (
           children
         ) : (
-          <p className="py-24 text-center font-chunky text-xl font-bold text-plum/60" role="status">
-            Checking your access…
-          </p>
+          <PlatformListSkeleton label="Checking your access…" />
         )}
       </main>
     </div>

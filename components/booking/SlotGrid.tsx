@@ -5,11 +5,12 @@ import { getAvailability } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
 import { useSalon } from "@/lib/salon/SalonContext";
 import type { AvailabilityResponse, Slot } from "@/lib/booking/types";
-import { Button, EmptyState, Loader } from "@/components/ui";
+import { Button, EmptyState } from "@/components/ui";
 import { cn } from "@/lib/utils/cn";
 import { formatDateLong, formatDuration, formatTime12h } from "@/lib/utils/time";
 import { StepError, StepShell } from "./StepShell";
 import { useAsync } from "./useAsync";
+import { SlotGridSkeleton } from "@/components/loading/shop";
 
 /**
  * Step 4 — pick a start time.
@@ -123,7 +124,7 @@ export function SlotGrid({ onSelected, onChangeDate }: SlotGridProps) {
         </Button>
       }
     >
-      {isLoading && <Loader label="Checking availability…" />}
+      {isLoading && <SlotGridSkeleton />}
 
       {error && <StepError message={error} onRetry={reload} />}
 

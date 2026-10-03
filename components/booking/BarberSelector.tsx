@@ -5,10 +5,11 @@ import { getBarbers } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
 import { useSalon } from "@/lib/salon/SalonContext";
 import type { Barber } from "@/lib/booking/types";
-import { Badge, EmptyState, Loader } from "@/components/ui";
+import { Badge, EmptyState } from "@/components/ui";
 import { getBarberPhotoUrl } from "@/lib/utils/barberImages";
 import { StepError, StepShell } from "./StepShell";
 import { useAsync } from "./useAsync";
+import { StylistCardsSkeleton } from "@/components/loading/shop";
 
 export function BarberAvatar({
   barber,
@@ -70,7 +71,7 @@ export function BarberSelector({ onSelected }: { onSelected: () => void }) {
           : "Choose your favourite stylist, or pick Any Stylist for the fastest availability."
       }
     >
-      {isLoading && <Loader label="Loading available stylists…" />}
+      {isLoading && <StylistCardsSkeleton />}
 
       {error && <StepError message={error} onRetry={reload} />}
 

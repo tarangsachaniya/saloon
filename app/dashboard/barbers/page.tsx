@@ -16,7 +16,6 @@ import {
   Button,
   Card,
   EmptyState,
-  Loader,
 } from "@/components/ui";
 import {
   deleteBarber,
@@ -29,6 +28,7 @@ import type { Barber, Service } from "@/lib/booking/types";
 import { cn } from "@/lib/utils/cn";
 import { initials } from "@/lib/utils/format";
 import { getBarberPhotoUrl } from "@/lib/utils/barberImages";
+import { AdminCardGridSkeleton } from "@/components/loading/admin";
 
 /**
  * The roster.
@@ -156,7 +156,7 @@ export default function BarbersPage() {
         }
       />
 
-      {isLoading && <Loader label="Loading roster…" />}
+      {isLoading && <AdminCardGridSkeleton label="Loading roster…" />}
 
       {error && !data && <LoadError message={error} onRetry={refresh} />}
 

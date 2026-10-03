@@ -8,6 +8,7 @@ import { inputClass } from "@/components/platform/fields";
 import { listPlatformSalons } from "@/lib/api/platform";
 import { useAdminData } from "@/lib/admin/useAdminData";
 import { THEMES } from "@/lib/themes";
+import { PlatformListSkeleton } from "@/components/loading/marketing";
 
 export default function PlatformSalonsPage() {
   const { data, error, isLoading, refresh } = useAdminData((signal) => listPlatformSalons({ signal }), []);
@@ -51,7 +52,7 @@ export default function PlatformSalonsPage() {
         />
       </div>
 
-      {isLoading && <p className="mt-10 font-bold text-plum/60" role="status">Loading salons…</p>}
+      {isLoading && <PlatformListSkeleton header={false} label="Loading salons…" />}
 
       {error && (
         <div role="alert" className="mt-8 rounded-2xl border-2 border-plum bg-tomato/25 p-4 font-semibold">

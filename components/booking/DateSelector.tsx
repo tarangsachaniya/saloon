@@ -5,7 +5,7 @@ import { getSettings } from "@/lib/api";
 import { useBooking } from "@/lib/booking/BookingContext";
 import { useSalon } from "@/lib/salon/SalonContext";
 import type { DateString } from "@/lib/booking/types";
-import { Calendar, Card, Loader, maxBookableDate } from "@/components/ui";
+import { Calendar, Card, maxBookableDate } from "@/components/ui";
 import {
   formatDateLong,
   formatTime12h,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/utils/time";
 import { StepError, StepShell } from "./StepShell";
 import { useAsync } from "./useAsync";
+import { CalendarSkeleton } from "@/components/loading/shop";
 
 /**
  * Step 3 — pick a date.
@@ -75,7 +76,7 @@ export function DateSelector({ onSelected }: { onSelected: () => void }) {
           : undefined
       }
     >
-      {isLoading && <Loader label="Loading the calendar…" />}
+      {isLoading && <CalendarSkeleton />}
 
       {error && <StepError message={error} onRetry={reload} />}
 

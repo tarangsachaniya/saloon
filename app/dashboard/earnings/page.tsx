@@ -8,7 +8,7 @@ import { MyEarningsView } from "@/components/admin/MyEarningsView";
 import { RefreshIcon } from "@/components/admin/icons";
 import { LoadError, PageHeader } from "@/components/admin/PageHeader";
 import { ToastViewport, useToasts } from "@/components/admin/Toast";
-import { Badge, Button, Card, EmptyState, Input, Loader } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Input } from "@/components/ui";
 import {
   getCommissionHistory,
   getEarningsSummary,
@@ -24,6 +24,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { cn } from "@/lib/utils/cn";
 import { formatPrice } from "@/lib/utils/format";
 import { formatDateLong, toDateString } from "@/lib/utils/time";
+import { AdminCardGridSkeleton, AdminListSkeleton } from "@/components/loading/admin";
 
 /**
  * Worker earnings (owner only). Totals and history come from the stored
@@ -187,7 +188,7 @@ export default function EarningsPage() {
         </div>
       )}
 
-      {summary.isLoading && <Loader label="Loading earnings…" />}
+      {summary.isLoading && <AdminCardGridSkeleton count={3} label="Loading earnings…" />}
       {summary.error && !summary.data && <LoadError message={summary.error} onRetry={summary.refresh} />}
 
       {summary.data && workers.length === 0 && (
@@ -243,7 +244,7 @@ export default function EarningsPage() {
               </button>
             ))}
           </div>
-          {history.isLoading && <Loader label="Loading commission history…" />}
+          {history.isLoading && <AdminListSkeleton rows={3} label="Loading commission history…" />}
           {history.error && !history.data && <LoadError message={history.error} onRetry={history.refresh} />}
           {history.data && history.data.length === 0 && (
             <EmptyState

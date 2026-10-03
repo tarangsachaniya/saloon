@@ -21,7 +21,6 @@ import {
   CardTitle,
   EmptyState,
   Input,
-  Loader,
 } from "@/components/ui";
 import { getAdminSettings, updateSettings } from "@/lib/api";
 import { toErrorMessage, useAdminData } from "@/lib/admin/useAdminData";
@@ -35,6 +34,7 @@ import {
   salonProfileSchema,
 } from "@/lib/validation/admin";
 import { fieldErrors } from "@/lib/validation/booking";
+import { AdminFormSkeleton } from "@/components/loading/admin";
 
 /**
  * Salon settings, in three independently-savable cards.
@@ -88,7 +88,7 @@ function SettingsEditor() {
         }
       />
 
-      {isLoading && <Loader label="Loading settings…" />}
+      {isLoading && <AdminFormSkeleton label="Loading settings…" />}
 
       {error && !data && <LoadError message={error} onRetry={refresh} />}
 

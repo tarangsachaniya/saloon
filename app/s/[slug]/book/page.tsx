@@ -11,7 +11,7 @@ import {
   ServiceSelector,
   SlotGrid,
 } from "@/components/booking";
-import { Loader } from "@/components/ui";
+
 import { getBarbers, getServices } from "@/lib/api";
 import { useSalon } from "@/lib/salon/SalonContext";
 import {
@@ -19,6 +19,7 @@ import {
   useBooking,
   type BookingStep,
 } from "@/lib/booking/BookingContext";
+import { ServiceCardsSkeleton } from "@/components/loading/shop";
 
 /**
  * The booking wizard shell and step router.
@@ -177,7 +178,7 @@ export default function BookPage() {
       />
 
       {preparing ? (
-        <Loader label="Preparing your booking…" />
+        <ServiceCardsSkeleton />
       ) : (
         // Keyed by step: a short fade/slide on change (no exit phase, so it never delays the next screen).
       <motion.div

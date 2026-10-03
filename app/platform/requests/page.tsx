@@ -6,6 +6,7 @@ import { popButton } from "@/components/marketing/pop/ui";
 import { card } from "@/components/platform/fields";
 import { useAdminData } from "@/lib/admin/useAdminData";
 import { getSalonRequest, listSalonRequests, type SalonRequest } from "@/lib/api/platform";
+import { PlatformListSkeleton } from "@/components/loading/marketing";
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -38,7 +39,7 @@ export default function SalonRequestsPage() {
         People who asked to list their salon. Contact them directly using the details below.
       </p>
 
-      {isLoading && <p className="mt-10 font-bold text-plum/60" role="status">Loading requests…</p>}
+      {isLoading && <PlatformListSkeleton header={false} label="Loading requests…" />}
       {error && (
         <div role="alert" className="mt-8 rounded-2xl border-2 border-plum bg-tomato/25 p-4 font-semibold">
           {error}{" "}

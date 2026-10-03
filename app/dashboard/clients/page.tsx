@@ -9,7 +9,6 @@ import {
   Button,
   EmptyState,
   Input,
-  Loader,
   Table,
   TableBody,
   TableCell,
@@ -23,6 +22,7 @@ import { useAdminData } from "@/lib/admin/useAdminData";
 import type { Client } from "@/lib/booking/types";
 import { formatAdminDate } from "@/lib/admin/format";
 import { initials } from "@/lib/utils/format";
+import { AdminListSkeleton } from "@/components/loading/admin";
 
 /**
  * The client directory — read-only.
@@ -95,7 +95,7 @@ export default function ClientsPage() {
         />
       </div>
 
-      {isLoading && <Loader label="Loading clients…" />}
+      {isLoading && <AdminListSkeleton label="Loading clients…" />}
 
       {error && !data && <LoadError message={error} onRetry={refresh} />}
 

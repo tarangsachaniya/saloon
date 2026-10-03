@@ -11,7 +11,6 @@ import {
   Badge,
   Button,
   EmptyState,
-  Loader,
   Table,
   TableBody,
   TableCell,
@@ -28,6 +27,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatPrice } from "@/lib/utils/format";
 import { formatDuration } from "@/lib/utils/time";
 import { getServiceImageUrl } from "@/lib/utils/barberImages";
+import { AdminTableSkeleton } from "@/components/loading/admin";
 
 /**
  * The service catalogue.
@@ -132,7 +132,7 @@ export default function ServicesPage() {
         }
       />
 
-      {isLoading && <Loader label="Loading services…" />}
+      {isLoading && <AdminTableSkeleton cols={5} label="Loading services…" />}
 
       {error && !data && <LoadError message={error} onRetry={refresh} />}
 

@@ -16,6 +16,7 @@ import {
   TagIcon,
   UsersIcon,
 } from "./icons";
+import { Skeleton } from "@/components/ui";
 
 /**
  * The admin chrome: a brand-navy sidebar on desktop, a header + thumb-reach
@@ -81,9 +82,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
     }
   }, [isLoading, token, user, pathname, router]);
 
-  const navItems = NAV_ITEMS.filter(
-    (item) => !item.ownerOnly || user?.role === "OWNER" || (item.workerToo && Boolean(user?.barberId)),
-  );
+  // Until the profile is known the nav would be wrong (owner-only links missing) and the
+  // name generic, then both would pop in. Show placeholders for that moment instead.
+  const profileLoading = isLoading || (Boolean(token) && !user);
+  const navItems = profileLoading
+    ? []
+    : NAV_ITEMS.filter(
+        (item) => !item.ownerOnly || user?.role === "OWNER" || (item.workerToo && Boolean(user?.barberId)),
+      );
   const displayName = user ? `${user.firstName} ${user.lastName ?? ""}`.trim() : "";
   const salonName = user?.salonName ?? "Salon Admin";
   const shopHref = user?.salonSlug ? `/s/${user.salonSlug}` : "/";
@@ -118,15 +124,25 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <span className="block text-[10px] font-extrabold uppercase tracking-widest text-secondary-light">
                 Back Office
               </span>
-              <span className="block text-base font-extrabold leading-tight text-white truncate">
-                {salonName}
-              </span>
+              {profileLoading ? (
+                <Skeleton className="mt-1.5 h-4 w-28 text-white" />
+              ) : (
+                <span className="block text-base font-extrabold leading-tight text-white truncate">
+                  {salonName}
+                </span>
+              )}
             </div>
           </Link>
         </div>
 
         <nav aria-label="Admin sections" className="flex-1 overflow-y-auto p-3">
           <ul className="flex flex-col gap-1">
+            {profileLoading &&
+              Array.from({ length: 6 }, (_, i) => (
+                <li key={i} className="px-1 py-1">
+                  <Skeleton className="h-9 w-full rounded-lg text-white" />
+                </li>
+              ))}
             {navItems.map((item) => {
               const active = isActive(pathname, item);
               return (
@@ -171,9 +187,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
               {displayName ? initials(displayName) : "—"}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-white">
-                {displayName || "Signed in"}
-              </span>
+              {profileLoading ? (
+                <Skeleton className="h-4 w-24 text-white" />
+              ) : (
+                <span className="block truncate text-sm font-semibold text-white">
+                  {displayName || "Signed in"}
+                </span>
+              )}
               {user && (
                 <span className="block truncate text-xs text-white/60">
                   {user.role === "OWNER" ? "Owner" : "Staff"}
@@ -203,9 +223,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <span className="block text-[10px] font-semibold uppercase tracking-widest text-secondary-light">
               Back office
             </span>
-            <span className="block truncate text-base font-extrabold leading-tight text-white">
-              {salonName}
-            </span>
+            {profileLoading ? (
+              <Skeleton className="mt-1.5 h-4 w-28 text-white" />
+            ) : (
+              <span className="block truncate text-base font-extrabold leading-tight text-white">
+                {salonName}
+              </span>
+            )}
           </Link>
           <div className="flex items-center gap-2">
             {displayName && (
@@ -238,6 +262,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
           className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_12px_rgba(5,59,80,0.08)] lg:hidden"
         >
           <ul className="flex items-stretch">
+            {profileLoading &&
+              Array.from({ length: 5 }, (_, i) => (
+                <li key={i} className="flex min-h-[3.5rem] min-w-0 flex-1 flex-col items-center justify-center gap-1.5 px-1 py-1.5">
+                  <Skeleton className="h-5 w-5 rounded-md" />
+                  <Skeleton className="h-2.5 w-10" />
+                </li>
+              ))}
             {navItems.map((item) => {
               const active = isActive(pathname, item);
               return (
