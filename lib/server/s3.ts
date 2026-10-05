@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { S3Client } from "@aws-sdk/client-s3";
+import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 
 /**
@@ -159,5 +159,56 @@ export function assertOwnImageUrls(
     if (!url) continue;
     if (existing.has(url)) continue;
     if (!isOurUrl(url, salonId)) throw new ForeignImageUrlError();
+  }
+}
+
+// ---- Android release builds -------------------------------------------------
+
+export const APK_CONTENT_TYPE = "application/vnd.android.package-archive";
+export const MAX_APK_BYTES = 300 * 1024 * 1024;
+const APK_PREFIX = "salonly/app-releases";
+const APK_POST_EXPIRES_SECONDS = 1800;
+
+export interface ApkUploadTarget {
+  uploadUrl: string;
+  fields: Record<string, string>;
+  /** Object key; send it back when registering the release. */
+  key: string;
+  publicUrl: string;
+  maxBytes: number;
+}
+
+/** A presigned POST for one APK. The key is generated here; the client never chooses it. */
+export async function createApkUploadTarget(): Promise<ApkUploadTarget> {
+  const config = readConfig();
+  const key = `${APK_PREFIX}/${randomUUID()}.apk`;
+  const { url, fields } = await createPresignedPost(getClient(config), {
+    Bucket: config.bucket,
+    Key: key,
+    Expires: APK_POST_EXPIRES_SECONDS,
+    Fields: { "Content-Type": APK_CONTENT_TYPE },
+    Conditions: [
+      ["content-length-range", 1024 * 1024, MAX_APK_BYTES],
+      ["eq", "$Content-Type", APK_CONTENT_TYPE],
+    ],
+  });
+  return { uploadUrl: url, fields, key, publicUrl: `${config.baseUrl}/${key}`, maxBytes: MAX_APK_BYTES };
+}
+
+/** True for a key this app issued from `createApkUploadTarget`. */
+export function isApkKey(key: string): boolean {
+  return new RegExp(`^${APK_PREFIX}/[0-9a-f-]{36}\\.apk$`).test(key);
+}
+
+/** Size in bytes of an uploaded APK, or null when the object is missing. */
+export async function headApk(key: string): Promise<{ sizeBytes: number; publicUrl: string } | null> {
+  const config = readConfig();
+  try {
+    const res = await getClient(config).send(new HeadObjectCommand({ Bucket: config.bucket, Key: key }));
+    return { sizeBytes: res.ContentLength ?? 0, publicUrl: `${config.baseUrl}/${key}` };
+  } catch (error) {
+    const name = (error as { name?: string }).name;
+    if (name === "NotFound" || name === "NoSuchKey") return null;
+    throw error;
   }
 }

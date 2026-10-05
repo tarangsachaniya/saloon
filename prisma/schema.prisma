@@ -482,3 +482,21 @@ model WorkerCommission {
   @@index([salonId, barberId, status])
   @@index([salonId, createdAt])
 }
+
+/// A published Android build. The mobile app compares its own versionCode to the
+/// newest active row; `mandatory` blocks the app until the user installs it.
+model AppRelease {
+  id          String   @id @default(uuid())
+  versionCode Int      @unique
+  versionName String
+  apkKey      String
+  apkUrl      String
+  sizeBytes   Int
+  sha256      String
+  notes       String?
+  mandatory   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([isActive, versionCode])
+}
