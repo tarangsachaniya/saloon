@@ -13,6 +13,7 @@ const NAV = [
   { href: "/platform", label: "Salons", exact: true },
   { href: "/platform/requests", label: "Salon requests", badge: true },
   { href: "/platform/salons/new", label: "+ New salon" },
+  { href: "/platform/releases", label: "App releases" },
 ];
 
 /**
