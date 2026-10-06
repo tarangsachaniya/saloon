@@ -119,7 +119,7 @@ export const TERMS: LegalDoc = {
       title: "Changes and contact",
       body: [
         "We may update these Terms; the new version applies from the date shown on this page, and continued use means you accept it.",
-        `Questions: ${BRAND.contact.email}, ${BRAND.contact.phone}. Grievances: ${BRAND.grievanceOfficer.email}. Registered office: ${L.registeredAddress}. GSTIN: ${L.gstin}.`,
+        `Questions: ${BRAND.contact.email}, ${BRAND.contact.phone} (WhatsApp: ${BRAND.contact.whatsapp}). Grievances: ${BRAND.grievanceOfficer.email}. Registered office: ${L.registeredAddress}. LLPIN: ${L.cin}. GSTIN: ${L.gstin}.`,
       ],
     },
   ],

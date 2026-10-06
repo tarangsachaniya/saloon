@@ -10,29 +10,30 @@ export const BRAND = {
     "Salonly gives every salon a beautiful online shop page, effortless booking and a back office that runs itself.",
   /** Public contact channels shown on the marketing site and legal pages. */
   contact: {
-    email: "hello@salonly.example",
-    phone: "+91 90000 00000",
-    address: "Bengaluru, India",
+    email: "contact@priinteve.com",
+    phone: "+91 96620 70751",
+    whatsapp: "+91 99090 70751",
+    address: "416, Mukhi ne Khadki, Paldi Gaam, Paldi, Ahmedabad 380007, Gujarat, India",
   },
   /** Statutory grievance contact (DPDP Act / IT Rules): a real person before launch. */
-  grievanceEmail: "grievance@salonly.example",
+  grievanceEmail: "contact@priinteve.com",
   /**
    * Legal identity shown on the legal pages. Every value in square brackets is a
    * PLACEHOLDER: replace it with the real registered details before launch.
    */
   legal: {
-    entityName: "[Registered company name] (operating as Salonly)",
-    registeredAddress: "[Registered office address], Bengaluru, Karnataka, India",
+    entityName: "Priinteve Innovations LLP (operating as Salonly)",
+    registeredAddress: "416, Mukhi ne Khadki, Paldi Gaam, Paldi, Ahmedabad 380007, Gujarat, India",
     gstin: "[GSTIN]",
-    cin: "[CIN / LLPIN, if applicable]",
-    jurisdictionCity: "Bengaluru",
-    jurisdictionState: "Karnataka",
+    cin: "ADC-7224",
+    jurisdictionCity: "Ahmedabad",
+    jurisdictionState: "Gujarat",
   },
   grievanceOfficer: {
     name: "[Grievance Officer name]",
     designation: "Grievance Officer",
-    email: "grievance@salonly.example",
-    phone: "+91 90000 00000",
+    email: "contact@priinteve.com",
+    phone: "+91 96620 70751",
     hours: "Monday to Saturday, 10:00 to 18:00 IST",
   },
 } as const;

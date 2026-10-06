@@ -53,6 +53,13 @@ export default function ContactPage() {
               <a href={`tel:${BRAND.contact.phone.replace(/\s+/g, "")}`} className="font-semibold text-plum underline underline-offset-2">
                 {BRAND.contact.phone}
               </a>
+              <br />
+              <a
+                href={`https://wa.me/${BRAND.contact.whatsapp.replace(/\D/g, "")}`}
+                className="font-semibold text-plum underline underline-offset-2"
+              >
+                WhatsApp {BRAND.contact.whatsapp}
+              </a>
             </p>
           </div>
         </aside>

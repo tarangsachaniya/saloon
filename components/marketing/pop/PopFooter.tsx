@@ -56,6 +56,15 @@ export function PopFooter() {
               <a href={`tel:${BRAND.contact.phone.replace(/\s+/g, "")}`} className="hover:underline">
                 {BRAND.contact.phone}
               </a>
+              <br />
+              <a href={`https://wa.me/${BRAND.contact.whatsapp.replace(/\D/g, "")}`} className="hover:underline">
+                WhatsApp {BRAND.contact.whatsapp}
+              </a>
+            </p>
+            <p className="mt-4 max-w-sm text-xs text-cream/60">
+              {BRAND.legal.entityName}
+              <br />
+              {BRAND.legal.registeredAddress}
             </p>
           </div>
           <div className="grid gap-10 sm:grid-cols-3">
@@ -86,7 +95,7 @@ export function PopFooter() {
         </div>
         <div className="mt-16 flex flex-col gap-2 border-t border-cream/15 py-6 text-xs text-cream/55 sm:flex-row sm:justify-between">
           <span>
-            &copy; {new Date().getFullYear()} {BRAND.name}. All rights reserved.
+            &copy; {new Date().getFullYear()} Priinteve Innovations LLP. All rights reserved.
           </span>
           <span>Made for salons with personality.</span>
         </div>
